@@ -26,7 +26,7 @@
 
 // Fader position tolerances
 #define TARGET_TOLERANCE 15      // How close (in analog units) fader must be to setpoint to consider "done"
-#define SEND_TOLERANCE   5       // Minimum analog change before reporting fader movement
+#define SEND_TOLERANCE   8       // Minimum analog change before reporting fader movement default is 1024/127 to give one logical step
 
 // Calibration settings
 #define PLATEAU_THRESH   2       // Threshold (analog delta) to consider that the fader has stopped moving
@@ -115,6 +115,8 @@ struct FaderConfig {
   uint8_t calibratePwm;
   uint8_t targetTolerance;
   uint8_t sendTolerance;
+  bool invertMotorDirection;
+  bool invertFaderRange;
 };
 
 // Touch sensor configuration
@@ -149,7 +151,7 @@ struct Fader {
   unsigned long lastMoveTime; // Time of last movement
   unsigned long lastOscSendTime; // Time of last OSC message
   int lastSentOscValue;     // Last value sent via OSC
-
+  bool suppressOSCOut;     // Suppress OSC out or Not
   uint16_t oscID;           // OSC ID like 201 for /Page2/Fader201
   
   // Filter variables

@@ -91,29 +91,7 @@ void loop() {
   pollWebServer();
   
   // Process OSC messages
-  int size = udp.parsePacket();
-  if (size > 0) {
-    const uint8_t *data = udp.data();
-    LiteOSCParser parser;
-
-    if (parser.parse(data, size)) {
-      const char* addr = parser.getAddress();
-      
-      // Check if it's a color message
-      if (strstr(addr, "/Color") != NULL) {
-        if (parser.getTag(0) == 's') {
-          handleColorOsc(addr, parser.getString(0));
-        }
-      } 
-      // Otherwise, treat it as a fader position message
-      else {
-        int value = parser.getInt(0);
-        handleOscPacket(addr, value);
-      }
-    } else {
-      debugPrint("Invalid OSC message.");
-    }
-  }
+  handleOscMessage();
 
   // Process touch changes - this function already checks the flag internally
   if (processTouchChanges()) {

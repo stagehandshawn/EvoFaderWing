@@ -9,6 +9,11 @@
 // MPR121 sensor object
 Adafruit_MPR121 mpr121 = Adafruit_MPR121();
 
+// Optional debug flag for printing raw touch data
+bool touchDebug = false;
+unsigned long touchDebugIntervalMs = 500;  // Minimum time between debug prints
+unsigned long lastTouchDebugTime = 0;
+
 // Interrupt and error handling
 volatile bool touchStateChanged = false;
 bool touchErrorOccurred = false;
@@ -102,6 +107,17 @@ bool processTouchChanges() {
   uint16_t currentTouches = mpr121.touched();
   unsigned long now = millis();
   bool stateUpdated = false;
+
+  if (touchDebug && now - lastTouchDebugTime >= touchDebugIntervalMs) {
+    lastTouchDebugTime = now;
+    debugPrint("Raw Touch Values:");
+    for (int j = 0; j < NUM_FADERS; j++) {
+      uint16_t baseline = mpr121.baselineData(j);
+      uint16_t filtered = mpr121.filteredData(j);
+      int16_t delta = baseline - filtered;
+      debugPrintf("Fader %d - Base: %u, Filtered: %u, Delta: %d", j, baseline, filtered, delta);
+    }
+  }
 
   if (currentTouches == 0xFFFF) {
     handleTouchError();

@@ -27,6 +27,7 @@ void initializeFaders() {
     faders[i].lastReportedValue = -1;
     faders[i].lastMoveTime = 0;
     faders[i].lastOscSendTime = 0;
+    faders[i].suppressOSCOut = false;
     faders[i].oscID = OSC_IDS[i];
     
     // Initialize filter
@@ -55,6 +56,7 @@ void initializeFaders() {
     faders[i].targetBrightness = baseBrightness;
     faders[i].brightnessStartTime = 0;
     faders[i].lastReportedBrightness = 0;
+  
   }
 }
 
@@ -347,4 +349,57 @@ void calibrateFaders() {
     f.smoothedPosition = currentReading;
     f.setpoint = currentReading;
   }
+}
+
+//================================
+// MOVE FADER TO SETPOINT
+//================================
+
+void moveFaderToSetpoint(Fader& f) {
+  const unsigned long timeout = 10000;          // Safety timeout in ms
+  unsigned long startTime = millis();
+
+  // Suppress OSC output until manual movement occurs
+  f.suppressOSCOut = true;
+
+  while (true) {
+    // Safety timeout
+    if ((millis() - startTime) > timeout) {
+      debugPrintf("Fader move timed out\n");
+      driveMotor(f, 0);
+      break;
+    }
+
+    // Update position
+    f.current = analogRead(f.analogPin);
+    f.smoothedPosition = readSmoothedPosition(f);
+
+    // Check if at target
+    if (abs(f.smoothedPosition - f.setpoint) <= config.targetTolerance) {
+      driveMotor(f, 0);
+      break;
+    }
+
+    // Compute PID
+    f.pidController->Compute();
+
+    // Apply velocity limiting
+    double targetOutput = f.motorOutput;
+    double currentOutput = f.lastMotorOutput;
+    if (abs(targetOutput - currentOutput) > MAX_VELOCITY_CHANGE) {
+      currentOutput += (targetOutput > currentOutput) ? MAX_VELOCITY_CHANGE : -MAX_VELOCITY_CHANGE;
+    } else {
+      currentOutput = targetOutput;
+    }
+    f.lastMotorOutput = currentOutput;
+
+    // Drive motor
+    driveMotor(f, currentOutput);
+
+    // Maintain responsiveness
+    pollWebServer();
+    yield();
+  }
+
+  f.state = FADER_IDLE;
 }

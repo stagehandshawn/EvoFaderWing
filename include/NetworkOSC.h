@@ -27,6 +27,10 @@ void handleOscPacket(const char *address, int value);
 void sendOscUpdate(Fader& f, int value, bool force = false);
 void handleColorOsc(const char *address, const char *colorString);
 
+void handleOscMovement(const char *address, int value);
+void handleOscMessage();
+
+
 // Color parsing (used by both NetworkOSC and NeoPixelControl)
 void parseColorValues(const char *colorString, Fader& f);
 

@@ -1,6 +1,8 @@
 #include "NetworkOSC.h"
 #include "Utils.h"
 
+void moveFaderToSetpoint(Fader& f);  // Forward declaration
+
 //================================
 // GLOBAL NETWORK OBJECTS
 //================================
@@ -44,20 +46,53 @@ void setupNetwork() {
 // OSC MESSAGE HANDLING
 //================================
 
-void handleOscPacket(const char *address, int value) {
-  for (int i = 0; i < NUM_FADERS; i++) {
-    Fader& f = faders[i];
-    char target[24];
-    snprintf(target, sizeof(target), "/Page2/Fader%d", f.oscID);
-    if (strcmp(address, target) == 0) {
-      // Map the incoming 0-127 value to the fader's analog range
-      int newSetpoint = map(value, 0, 127, f.minVal, f.maxVal);
-      
-      // ONLY change state to MOVING if the setpoint is actually different
-      if (abs(newSetpoint - f.setpoint) > config.targetTolerance) {
-        f.setpoint = newSetpoint;
-        f.state = FADER_MOVING;  // Only enter moving state when receiving a new position
-        debugPrintf("OSC IN → Fader %d (%s) = %d, setpoint = %.1f\n", i, address, value, f.setpoint);
+// Consolidated OSC message handler
+void handleOscMessage() {
+  int size = udp.parsePacket();
+  if (size <= 0) return;
+
+  const uint8_t *data = udp.data();
+  LiteOSCParser parser;
+
+  if (!parser.parse(data, size)) {
+    debugPrint("Invalid OSC message.");
+    return;
+  }
+
+  const char* addr = parser.getAddress();
+
+  // Handle color messages
+  if (strstr(addr, "/Color") != NULL) {
+    if (parser.getTag(0) == 's') {
+      handleColorOsc(addr, parser.getString(0));
+    }
+  }
+  // Handle fader movement messages
+  else {
+    if (parser.getTag(0) == 'i') {
+      int value = parser.getInt(0);
+      handleOscMovement(addr, value);
+    }
+  }
+}
+
+// Handles fader movement OSC messages
+void handleOscMovement(const char *address, int value) {
+  // Extract the fader ID from the OSC address
+  int faderID = -1;
+  if (sscanf(address, "/Page2/Fader%d", &faderID) == 1) {
+    for (int i = 0; i < NUM_FADERS; i++) {
+      Fader& f = faders[i];
+      if (f.oscID == faderID) {
+        // Map the incoming 0-127 value to the fader's analog range
+        int newSetpoint = map(value, 0, 127, f.minVal, f.maxVal);
+
+        if (abs(newSetpoint - f.setpoint) > config.targetTolerance) {
+          f.setpoint = newSetpoint;
+          debugPrintf("OSC IN → Fader %d (%s) = %d, setpoint = %.1f\n", i, address, value, f.setpoint);
+          moveFaderToSetpoint(f);
+        }
+        break;
       }
     }
   }

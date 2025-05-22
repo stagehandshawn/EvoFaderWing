@@ -11,6 +11,9 @@
 // Main fader processing
 void handleFaders();
 
+//Fader movement
+void moveFaderToSetpoint(Fader& f);
+
 // Fader initialization
 void initializeFaders();
 void configureFaderPins();
@@ -26,5 +29,6 @@ void updateFaderState(Fader& f);
 
 // Calibration
 void calibrateFaders();
+
 
 #endif // FADER_CONTROL_H
