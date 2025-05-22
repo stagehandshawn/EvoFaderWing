@@ -1,4 +1,4 @@
-# Teensy 4.1 Motorized Fader Controller
+# GMA3 FaderWing
 
 A comprehensive PlatformIO project for controlling motorized faders with OSC communication, web configuration, and touch sensing.
 
