@@ -1,0 +1,232 @@
+#include "NetworkOSC.h"
+#include "Utils.h"
+
+//================================
+// GLOBAL NETWORK OBJECTS
+//================================
+
+// Add to TOP of src/NetworkOSC.cpp:
+EthernetUDP udp;
+
+
+//================================
+// NETWORK SETUP
+//================================
+
+void setupNetwork() {
+  debugPrint("Setting up network...");
+  
+  // Start Ethernet with configured settings
+  if (netConfig.useDHCP) {
+    debugPrint("Using DHCP...");
+    if (!Ethernet.begin() || !Ethernet.waitForLocalIP(kDHCPTimeout)) {
+      debugPrint("Failed DHCP, switching to static IP");
+      Ethernet.begin(netConfig.staticIP, netConfig.subnet, netConfig.gateway);
+    }
+  } else {
+    debugPrint("Using static IP...");
+    Ethernet.begin(netConfig.staticIP, netConfig.subnet, netConfig.gateway);
+  }
+
+  IPAddress ip = Ethernet.localIP();
+  debugPrintf("IP Address: %u.%u.%u.%u\n", ip[0], ip[1], ip[2], ip[3]);
+
+  // Start UDP for OSC
+  udp.begin(netConfig.receivePort);
+  
+  // Set up mDNS for service discovery
+  MDNS.begin(kServiceName);
+  MDNS.addService("_osc", "_udp", netConfig.receivePort);
+  debugPrint("OSC and mDNS initialized");
+}
+
+//================================
+// OSC MESSAGE HANDLING
+//================================
+
+void handleOscPacket(const char *address, int value) {
+  for (int i = 0; i < NUM_FADERS; i++) {
+    Fader& f = faders[i];
+    char target[24];
+    snprintf(target, sizeof(target), "/Page2/Fader%d", f.oscID);
+    if (strcmp(address, target) == 0) {
+      // Map the incoming 0-127 value to the fader's analog range
+      int newSetpoint = map(value, 0, 127, f.minVal, f.maxVal);
+      
+      // ONLY change state to MOVING if the setpoint is actually different
+      if (abs(newSetpoint - f.setpoint) > config.targetTolerance) {
+        f.setpoint = newSetpoint;
+        f.state = FADER_MOVING;  // Only enter moving state when receiving a new position
+        debugPrintf("OSC IN → Fader %d (%s) = %d, setpoint = %.1f\n", i, address, value, f.setpoint);
+      }
+    }
+  }
+}
+
+void sendOscUpdate(Fader& f, int value, bool force) {
+  unsigned long now = millis();
+  
+  // Only send if value changed significantly or enough time passed or force flag is set
+  if (force || (abs(value - f.lastSentOscValue) >= OSC_VALUE_THRESHOLD && 
+      now - f.lastOscSendTime > OSC_RATE_LIMIT)) {
+    
+    char oscAddress[24];
+    snprintf(oscAddress, sizeof(oscAddress), "/Page2/Fader%d", f.oscID);
+    
+    // Create OSC message - This is a simplified placeholder
+    // OSC message format: [address]\0,[tags]\0,data...
+    
+    uint8_t buffer[64];
+    int size = 0;
+    
+    // Copy address with null terminator
+    int addrLen = strlen(oscAddress);
+    memcpy(buffer + size, oscAddress, addrLen + 1);
+    size += addrLen + 1;
+    
+    // Pad to 4-byte boundary
+    while ((size & 3) != 0) buffer[size++] = 0;
+    
+    // Add type tag - for integer value
+    buffer[size++] = ',';
+    buffer[size++] = 'i'; // Integer type
+    buffer[size++] = 0;   // Null terminator
+    buffer[size++] = 0;   // Padding to 4-byte boundary
+    
+    // Add value (big-endian 32-bit integer)
+    buffer[size++] = (value >> 24) & 0xFF;
+    buffer[size++] = (value >> 16) & 0xFF;
+    buffer[size++] = (value >> 8) & 0xFF;
+    buffer[size++] = value & 0xFF;
+    
+    // Send OSC packet
+    udp.beginPacket(netConfig.sendToIP, netConfig.sendPort);
+    udp.write(buffer, size);
+    udp.endPacket();
+    
+    f.lastOscSendTime = now;
+    f.lastSentOscValue = value;
+  }
+}
+
+void handleColorOsc(const char *address, const char *colorString) {
+  // Extract the fader ID from the address
+  int faderID = 0;
+  
+  // Search for "Color" in the address string
+  const char* colorPos = strstr(address, "Color");
+  if (colorPos) {
+    // Extract fader ID after "Color"
+    faderID = atoi(colorPos + 5); // +5 to skip past "Color"
+    
+    // Find the fader with matching OSC ID
+    for (int i = 0; i < NUM_FADERS; i++) {
+      if (faders[i].oscID == faderID) {
+        parseColorValues(colorString, faders[i]);
+        debugPrintf("Color update for Fader %d: R=%d, G=%d, B=%d\n", 
+                   i, faders[i].red, faders[i].green, faders[i].blue);
+        break;
+      }
+    }
+  }
+}
+
+//================================
+// OSC UTILITY FUNCTIONS
+//================================
+
+// Parse color values from a string like "255;127;0;255"
+void parseColorValues(const char *colorString, Fader& f) {
+  char buffer[64];
+  strncpy(buffer, colorString, 63);
+  buffer[63] = '\0'; // Ensure null-termination
+  
+  // Parse red component
+  char *ptr = strtok(buffer, ";");
+  if (ptr != NULL) {
+    f.red = constrain(atoi(ptr), 0, 255);
+    
+    // Parse green component
+    ptr = strtok(NULL, ";");
+    if (ptr != NULL) {
+      f.green = constrain(atoi(ptr), 0, 255);
+      
+      // Parse blue component
+      ptr = strtok(NULL, ";");
+      if (ptr != NULL) {
+        f.blue = constrain(atoi(ptr), 0, 255);
+        
+        // Alpha value is in the fourth position, but we ignore it
+      }
+    }
+  }
+  
+  f.colorUpdated = true;
+}
+
+// Checks if the buffer starts as a valid bundle
+bool isBundleStart(const uint8_t *buf, size_t len) {
+  if (len < 16 || (len & 0x03) != 0) {
+    return false;
+  }
+  if (strncmp((const char*)buf, "#bundle", 8) != 0) {
+    return false;
+  }
+  return true;
+}
+
+// Print an OSC message for debugging
+void printOSC(Print &out, const uint8_t *b, int len) {
+  LiteOSCParser osc;
+
+  // Check if it's a bundle
+  if (isBundleStart(b, len)) {
+    out.println("#bundle (not parsed)");
+    return;
+  }
+
+  // Parse the message
+  if (!osc.parse(b, len)) {
+    if (osc.isMemoryError()) {
+      out.println("#MemoryError");
+    } else {
+      out.println("#ParseError");
+    }
+    return;
+  }
+
+  // Print address
+  out.printf("%s", osc.getAddress());
+
+  // Print arguments
+  int size = osc.getArgCount();
+  for (int i = 0; i < size; i++) {
+    if (i == 0) {
+      out.print(": ");
+    } else {
+      out.print(", ");
+    }
+    
+    // Print based on type
+    switch (osc.getTag(i)) {
+      case 'i':
+        out.printf("int(%d)", osc.getInt(i));
+        break;
+      case 'f':
+        out.printf("float(%f)", osc.getFloat(i));
+        break;
+      case 's':
+        out.printf("string(\"%s\")", osc.getString(i));
+        break;
+      case 'T':
+        out.print("true");
+        break;
+      case 'F':
+        out.print("false");
+        break;
+      default:
+        out.printf("unknown(%c)", osc.getTag(i));
+    }
+  }
+  out.println();
+}

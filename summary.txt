@@ -1,0 +1,86 @@
+TEENSY 4.1 MOTORIZED FADER CONTROLLER - PLATFORMIO PROJECT STRUCTURE
+
+This is the complete file structure for converting your Arduino sketch to a modular PlatformIO project.
+
+ROOT DIRECTORY FILES:
+├── platformio.ini          # PlatformIO configuration with libraries and build settings
+└── README.md              # Complete project documentation
+
+INCLUDE DIRECTORY (Header Files):
+include/
+├── Config.h               # Global configuration, constants, structs, and extern declarations
+├── EEPROMStorage.h        # EEPROM memory management function declarations
+├── TouchSensor.h          # MPR121 touch sensor function declarations
+├── NetworkOSC.h           # Network setup and OSC communication declarations
+├── FaderControl.h         # Motor control and calibration declarations
+├── NeoPixelControl.h      # LED strip management declarations
+├── WebServer.h            # HTTP server and web interface declarations
+└── Utils.h                # Helper functions and utilities declarations
+
+SRC DIRECTORY (Source Files):
+src/
+├── main.cpp               # Main Arduino sketch - setup() and loop()
+├── Config.cpp             # Global variable definitions and pin assignments
+├── EEPROMStorage.cpp      # All EEPROM read/write functions and calibration storage
+├── TouchSensor.cpp        # Complete MPR121 implementation from your second file
+├── NetworkOSC.cpp         # Network setup, OSC parsing, and color message handling
+├── FaderControl.cpp       # Motor control, PID, calibration, and state management
+├── NeoPixelControl.cpp    # NeoPixel initialization and brightness/color updates
+├── WebServer.cpp          # Complete web server with all request handlers
+└── Utils.cpp              # Debug printing, IP conversion, and parameter parsing
+
+MODULE DEPENDENCIES:
+┌─────────────────────┐
+│      main.cpp       │ ← Main entry point
+└─────────┬───────────┘
+          │
+    ┌─────▼─────┐ ┌─────────────┐ ┌──────────────┐ ┌─────────────┐
+    │  Config   │ │ EEPROMStorage│ │ TouchSensor  │ │   Utils     │
+    │           │ │             │ │              │ │             │
+    └─────┬─────┘ └──────┬──────┘ └──────┬───────┘ └─────┬───────┘
+          │              │               │               │
+    ┌─────▼─────┐ ┌──────▼──────┐ ┌──────▼───────┐ ┌─────▼───────┐
+    │NetworkOSC │ │FaderControl │ │NeoPixelControl│ │ WebServer   │
+    │           │ │             │ │              │ │             │
+    └───────────┘ └─────────────┘ └──────────────┘ └─────────────┘
+
+KEY IMPROVEMENTS FROM ORIGINAL:
+✓ Modular architecture - each functionality in separate files
+✓ Clean separation of concerns
+✓ Proper header/source file organization
+✓ PlatformIO library management
+✓ Improved build system
+✓ Better code maintainability
+✓ Easier debugging and testing
+✓ Scalable for future features
+
+MIGRATION STEPS:
+1. Create new PlatformIO project: `pio project init --board teensy41`
+2. Copy platformio.ini to project root
+3. Create include/ and src/ directories
+4. Copy all header files to include/
+5. Copy all source files to src/
+6. Build project: `pio run`
+7. Upload to Teensy: `pio run --target upload`
+
+VERIFICATION CHECKLIST:
+□ All original functionality preserved
+□ All global variables properly declared/defined
+□ All function prototypes match implementations
+□ No circular dependencies between modules
+□ All includes properly referenced
+□ PlatformIO builds without errors
+□ Web interface accessible
+□ OSC communication working
+□ Touch sensors responding
+□ Fader control operational
+□ NeoPixels functioning
+□ EEPROM storage working
+
+The modular structure makes it much easier to:
+- Debug specific functionality
+- Add new features
+- Modify individual components
+- Test modules independently
+- Maintain code quality
+- Collaborate with other developers

@@ -1,0 +1,104 @@
+# Teensy 4.1 Motorized Fader Controller
+
+A comprehensive PlatformIO project for controlling motorized faders with OSC communication, web configuration, and touch sensing.
+
+## Project Structure
+
+```
+├── platformio.ini          # PlatformIO configuration
+├── README.md               # This file
+├── include/                # Header files
+│   ├── Config.h           # Hardware configuration and constants
+│   ├── EEPROMStorage.h    # Persistent storage management
+│   ├── TouchSensor.h      # MPR121 touch sensor handling
+│   ├── NetworkOSC.h       # Network setup and OSC communication
+│   ├── FaderControl.h     # Motor control and calibration
+│   ├── NeoPixelControl.h  # LED strip management
+│   ├── WebServer.h        # HTTP configuration interface
+│   └── Utils.h            # Helper functions and utilities
+└── src/                   # Source files
+    ├── main.cpp           # Main Arduino sketch
+    ├── Config.cpp         # Global configuration instances
+    ├── EEPROMStorage.cpp  # EEPROM read/write functions
+    ├── TouchSensor.cpp    # Touch sensor implementation
+    ├── NetworkOSC.cpp     # Network and OSC handling
+    ├── FaderControl.cpp   # Fader motor control
+    ├── NeoPixelControl.cpp # NeoPixel LED control
+    ├── WebServer.cpp      # Web server implementation
+    └── Utils.cpp          # Utility functions
+```
+
+## Module Overview
+
+### Config Module
+- **Files**: `Config.h`, `Config.cpp`
+- **Purpose**: Central configuration management
+- **Contains**: Pin assignments, constants, struct definitions, global variables
+
+### EEPROMStorage Module
+- **Files**: `EEPROMStorage.h`, `EEPROMStorage.cpp`
+- **Purpose**: Persistent storage of settings
+- **Features**: Calibration data, network config, fader settings, touch settings
+
+### TouchSensor Module
+- **Files**: `TouchSensor.h`, `TouchSensor.cpp`
+- **Purpose**: MPR121 capacitive touch sensing
+- **Features**: Interrupt-driven touch detection, auto-calibration, error recovery
+
+### NetworkOSC Module
+- **Files**: `NetworkOSC.h`, `NetworkOSC.cpp`
+- **Purpose**: Network communication and OSC protocol
+- **Features**: Ethernet setup, OSC message parsing, color message handling
+
+### FaderControl Module
+- **Files**: `FaderControl.h`, `FaderControl.cpp`
+- **Purpose**: Motor control and fader management
+- **Features**: PID control, calibration, position filtering, state machine
+
+### NeoPixelControl Module
+- **Files**: `NeoPixelControl.h`, `NeoPixelControl.cpp`
+- **Purpose**: LED strip control
+- **Features**: Color management, brightness fading, touch-responsive lighting
+
+### WebServer Module
+- **Files**: `WebServer.h`, `WebServer.cpp`
+- **Purpose**: Web-based configuration interface
+- **Features**: Settings forms, real-time status, factory reset options
+
+### Utils Module
+- **Files**: `Utils.h`, `Utils.cpp`
+- **Purpose**: Common utility functions
+- **Features**: Debug printing, IP address conversion, parameter parsing
+
+## Hardware Configuration
+
+### Faders
+- **Count**: 10 motorized faders
+- **Analog Pins**: 14-17, 20-25 (position feedback)
+- **PWM Pins**: 2-11 (motor speed control)
+- **Direction Pins**: 26-43 (motor direction control)
+
+### Touch Sensor
+- **IC**: MPR121 capacitive touch controller
+- **Address**: 0x5A (I2C)
+- **IRQ Pin**: 2
+- **Channels**: 10 (one per fader)
+
+### NeoPixels
+- **Data Pin**: 40
+- **Count**: 10 LEDs (one per fader)
+- **Type**: WS2812B/NeoPixel compatible
+
+### Network
+- **Interface**: Built-in Ethernet (Teensy 4.1)
+- **Protocols**: UDP/OSC, HTTP, mDNS
+- **Default Ports**: 8000 (OSC receive), 9000 (OSC send), 80 (HTTP)
+
+## Getting Started
+
+1. **Install PlatformIO**: Follow the [PlatformIO installation guide](https://platformio.org/install)
+
+2. **Clone/Create Project**: 
+   ```bash
+   # Create new PlatformIO project
+   pio project init
