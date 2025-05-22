@@ -105,7 +105,7 @@ struct NetworkConfig {
 // FADER CONFIGURATION
 //================================
 
-// Configuration structure that can be saved to EEPROM
+// Configuration for per-fader motor behavior and PID tuning
 struct FaderConfig {
   float pidKp;
   float pidKi;
@@ -115,6 +115,9 @@ struct FaderConfig {
   uint8_t calibratePwm;
   uint8_t targetTolerance;
   uint8_t sendTolerance;
+  // Fader behavior modifiers
+  bool invertMotorDirection;   // If true, reverses motor direction logic
+  bool invertFaderRange;       // If true, swaps min/max logic for fader values
 };
 
 // Touch sensor configuration
@@ -201,6 +204,8 @@ FaderConfig config = {
   .calibratePwm = CALIB_PWM,
   .targetTolerance = TARGET_TOLERANCE,
   .sendTolerance = SEND_TOLERANCE,
+  .invertMotorDirection = false,
+  .invertFaderRange = false,
 };
 
 NetworkConfig netConfig = {

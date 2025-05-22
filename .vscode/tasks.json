@@ -1,0 +1,11 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Git Commit with Timestamp",
+      "type": "shell",
+      "command": "git add . && git commit -m \"Auto-snapshot: $(date '+%Y-%m-%d %H:%M:%S')\" || echo 'Nothing to commit'",
+      "problemMatcher": []
+    }
+  ]
+}
