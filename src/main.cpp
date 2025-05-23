@@ -44,6 +44,7 @@
 #include "NeoPixelControl.h"
 #include "WebServer.h"
 #include "Utils.h"
+#include "i2cPolling.h"
 
 using namespace qindesign::network;
 using qindesign::osc::LiteOSCParser;
