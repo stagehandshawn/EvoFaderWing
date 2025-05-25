@@ -1,3 +1,5 @@
+#include "OLED.h"
+extern OLED display;
 #include "Utils.h"
 #include "Config.h"
 #include <stdarg.h>
@@ -9,6 +11,7 @@
 void debugPrint(const char* message) {
   if (debugMode) {
     Serial.println(message);
+    display.addDebugLine(message);
   }
 }
 
@@ -24,8 +27,10 @@ void debugPrintf(const char* format, ...) {
     size_t len = strlen(format);
     if (len > 0 && format[len-1] == '\n') {
       Serial.print(buffer); // Already has newline
+      display.addDebugLine(buffer);
     } else {
       Serial.println(buffer); // Add newline
+      display.addDebugLine(buffer);
     }
   }
 }

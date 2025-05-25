@@ -45,11 +45,15 @@
 #include "WebServer.h"
 #include "Utils.h"
 #include "i2cPolling.h"
+#include "OLED.h"
 
 using namespace qindesign::network;
 using qindesign::osc::LiteOSCParser;
 
 unsigned long lastI2CPollTime = 0;     // Time of last I2C poll cycle
+
+OLED display;             // <-- define display here
+IPAddress currentIP;      // <-- define currentIP
 
 //================================
 // MAIN ARDUINO FUNCTIONS
@@ -79,7 +83,14 @@ void setup() {
    
   // Set up network connection
   setupNetwork();
-  
+
+  display.setupOLED();
+
+  display.clear();
+  // Show IP address
+  currentIP = Ethernet.localIP();
+  display.showIPAddress(currentIP);
+
   // Start web server for configuration
   startWebServer();
   
