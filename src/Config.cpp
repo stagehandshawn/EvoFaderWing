@@ -66,7 +66,9 @@ unsigned long fadeTime = 1000;  // Duration in ms for brightness fade animation
 //================================
 // DEBUG SETTINGS
 //================================
-bool debugMode = true;  // Enables or disables verbose serial output
+#ifdef DEBUG
+  bool debugMode = true;  // Enables or disables verbose serial output
+#endif
 
 //================================
 // TOUCH SENSOR GLOBALS
@@ -75,3 +77,9 @@ bool debugMode = true;  // Enables or disables verbose serial output
 int autoCalibrationMode = 2;     // 0 = Off, 1 = Normal, 2 = Conservative
 uint8_t touchThreshold = 12;     // Higher = less sensitive
 uint8_t releaseThreshold = 6;    // Lower = harder to release
+
+
+//================================
+// I2C POLLING VARIABLES
+//================================
+const unsigned long pollInterval = 5; // 5ms for I2C polling

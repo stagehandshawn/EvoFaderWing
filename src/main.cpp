@@ -49,6 +49,8 @@
 using namespace qindesign::network;
 using qindesign::osc::LiteOSCParser;
 
+unsigned long lastI2CPollTime = 0;     // Time of last I2C poll cycle
+
 //================================
 // MAIN ARDUINO FUNCTIONS
 //================================
@@ -71,6 +73,9 @@ void setup() {
 
   // Load configurations from EEPROM
   loadAllConfig();
+
+  //Setup I2C Slaves so we can also check for network reset
+  setupI2cPolling();
    
   // Set up network connection
   setupNetwork();
@@ -93,6 +98,10 @@ void loop() {
   
   // Process OSC messages
   handleOscMessage();
+
+  // Handle I2C Polling for encoders keypresses and encoder key press
+    handleI2c();
+
 
   // Process touch changes - this function already checks the flag internally
   if (processTouchChanges()) {
