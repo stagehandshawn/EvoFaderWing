@@ -8,7 +8,7 @@
 //================================
 
 void saveCalibration() {
-  EEPROM.write(EEPROM_CAL_SIGNATURE_ADDR, EEPROM_SIGNATURE);
+  EEPROM.write(EEPROM_CAL_SIGNATURE_ADDR, CALCFG_EEPROM_SIGNATURE);
   int addr = EEPROM_CAL_DATA_ADDR;
   for (int i = 0; i < NUM_FADERS; i++) {
     EEPROM.put(addr, faders[i].minVal); addr += sizeof(int);
@@ -27,7 +27,7 @@ void loadCalibration() {
 }
 
 void checkCalibration() {
-  if (EEPROM.read(EEPROM_CAL_SIGNATURE_ADDR) != EEPROM_SIGNATURE) {
+  if (EEPROM.read(EEPROM_CAL_SIGNATURE_ADDR) != CALCFG_EEPROM_SIGNATURE) {
     debugPrint("Running calibration...");
     // Note: calibrateFaders() is in FaderControl module
     // calibrateFaders();
@@ -46,7 +46,7 @@ void checkCalibration() {
 
 void saveFaderConfig() {
   // Write signature
-  EEPROM.write(EEPROM_CONFIG_SIGNATURE_ADDR, EEPROM_CONFIG_SIGNATURE);
+  EEPROM.write(EEPROM_CONFIG_SIGNATURE_ADDR, FADERCFG_EEPROM_SIGNATURE);
   
   // Write configuration (primitive types only)
   EEPROM.put(EEPROM_CONFIG_DATA_ADDR, config);
@@ -56,7 +56,7 @@ void saveFaderConfig() {
 
 void loadConfig() {
   // Check signature
-  if (EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR) == EEPROM_CONFIG_SIGNATURE) {
+  if (EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR) == FADERCFG_EEPROM_SIGNATURE) {
     // Load configuration
     EEPROM.get(EEPROM_CONFIG_DATA_ADDR, config);
     debugPrint("Fader configuration loaded from EEPROM.");
@@ -135,7 +135,7 @@ void saveTouchConfig() {
   }
   
   // Write signature
-  EEPROM.write(EEPROM_TOUCH_SIGNATURE_ADDR, EEPROM_TOUCH_SIGNATURE);
+  EEPROM.write(EEPROM_TOUCH_SIGNATURE_ADDR, TOUCHCFG_EEPROM_SIGNATURE);
   
   // Write configuration
   EEPROM.put(EEPROM_TOUCH_DATA_ADDR, touchConfig);
@@ -145,7 +145,7 @@ void saveTouchConfig() {
 
 void loadTouchConfig() {
   // Check signature
-  if (EEPROM.read(EEPROM_TOUCH_SIGNATURE_ADDR) == EEPROM_TOUCH_SIGNATURE) {
+  if (EEPROM.read(EEPROM_TOUCH_SIGNATURE_ADDR) == TOUCHCFG_EEPROM_SIGNATURE) {
     // Create a temporary structure to hold the data
     TouchConfig touchConfig;
     
@@ -244,7 +244,7 @@ void dumpEepromConfig() {
   
   // Check calibration data
   debugPrint("\n--- Fader Calibration ---");
-  if (EEPROM.read(EEPROM_CAL_SIGNATURE_ADDR) == EEPROM_SIGNATURE) {
+  if (EEPROM.read(EEPROM_CAL_SIGNATURE_ADDR) == CALCFG_EEPROM_SIGNATURE) {
     debugPrint("Calibration data is valid");
     
     int addr = EEPROM_CAL_DATA_ADDR;
@@ -257,12 +257,12 @@ void dumpEepromConfig() {
     }
   } else {
     debugPrintf("Calibration data not found (signature=0x%02X, expected=0x%02X)\n", 
-               EEPROM.read(EEPROM_CAL_SIGNATURE_ADDR), EEPROM_SIGNATURE);
+               EEPROM.read(EEPROM_CAL_SIGNATURE_ADDR), CALCFG_EEPROM_SIGNATURE);
   }
   
   // Check fader configuration
   debugPrint("\n--- Fader Configuration ---");
-  if (EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR) == EEPROM_CONFIG_SIGNATURE) {
+  if (EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR) == FADERCFG_EEPROM_SIGNATURE) {
     debugPrint("Fader configuration is valid");
     
     FaderConfig storedConfig;
@@ -278,7 +278,7 @@ void dumpEepromConfig() {
     debugPrintf("Send Tolerance: %d\n", storedConfig.sendTolerance);
   } else {
     debugPrintf("Fader config not found (signature=0x%02X, expected=0x%02X)\n", 
-               EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR), EEPROM_CONFIG_SIGNATURE);
+               EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR), FADERCFG_EEPROM_SIGNATURE);
   }
   
   // Check network configuration
@@ -315,7 +315,7 @@ void dumpEepromConfig() {
   
   // Check touch configuration
   debugPrint("\n--- Touch Sensor Configuration ---");
-  if (EEPROM.read(EEPROM_TOUCH_SIGNATURE_ADDR) == EEPROM_TOUCH_SIGNATURE) {
+  if (EEPROM.read(EEPROM_TOUCH_SIGNATURE_ADDR) == TOUCHCFG_EEPROM_SIGNATURE) {
     debugPrint("Touch sensor configuration is valid");
     
     TouchConfig touchConfig;
@@ -326,13 +326,13 @@ void dumpEepromConfig() {
     debugPrintf("Release Threshold: %d\n", touchConfig.releaseThreshold);
   } else {
     debugPrintf("Touch config not found (signature=0x%02X, expected=0x%02X)\n",
-               EEPROM.read(EEPROM_TOUCH_SIGNATURE_ADDR), EEPROM_TOUCH_SIGNATURE);
+               EEPROM.read(EEPROM_TOUCH_SIGNATURE_ADDR), TOUCHCFG_EEPROM_SIGNATURE);
   }
   
   // Compare current settings with stored settings
   debugPrint("\n--- Current vs Stored Settings ---");
   debugPrint("Fader Configuration:");
-  if (EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR) == EEPROM_CONFIG_SIGNATURE) {
+  if (EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR) == FADERCFG_EEPROM_SIGNATURE) {
     FaderConfig storedConfig;
     EEPROM.get(EEPROM_CONFIG_DATA_ADDR, storedConfig);
     

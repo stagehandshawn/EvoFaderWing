@@ -1,6 +1,9 @@
 #include "NeoPixelControl.h"
 #include "Utils.h"
 
+//NeoPixel Debug print
+bool neoPixelDebug = false;
+
 //================================
 // GLOBAL NEOPIXEL OBJECT
 //================================
@@ -57,7 +60,7 @@ void updateNeoPixels() {
     uint32_t color = pixels.Color(r, g, b);
 
     // Only output debug when brightness changes
-    if (f.currentBrightness != f.lastReportedBrightness) {
+    if (neoPixelDebug && f.currentBrightness != f.lastReportedBrightness) {
       debugPrintf("Fader %d RGB → R=%d G=%d B=%d (Brightness=%d)",
                   i, r, g, b, f.currentBrightness);
       f.lastReportedBrightness = f.currentBrightness;
@@ -67,4 +70,24 @@ void updateNeoPixels() {
   }
 
   pixels.show();
+}
+
+void updateBrightnessOnFaderTouchChange() {
+  static bool previousTouch[NUM_FADERS] = { false };
+
+  for (int i = 0; i < NUM_FADERS; i++) {
+    Fader& f = faders[i];
+    bool currentTouch = f.touched;
+
+    if (currentTouch != previousTouch[i]) {
+      f.brightnessStartTime = millis();
+      f.targetBrightness = currentTouch ? touchedBrightness : baseBrightness;
+
+      debugPrintf("Fader %d → Touch %s → Brightness target = %d", i,
+                  currentTouch ? "TOUCHED" : "released",
+                  f.targetBrightness);
+
+      previousTouch[i] = currentTouch;
+    }
+  }
 }

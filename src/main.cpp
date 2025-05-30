@@ -50,6 +50,8 @@
 using namespace qindesign::network;
 using qindesign::osc::LiteOSCParser;
 
+void updateBrightnessOnFaderTouchChange();
+
 unsigned long lastI2CPollTime = 0;     // Time of last I2C poll cycle
 
 OLED display;             // <-- define display here
@@ -79,7 +81,8 @@ void setup() {
   loadAllConfig();
 
   //Setup I2C Slaves so we can also check for network reset
-  setupI2cPolling();
+  //setupI2cPolling();
+  setupI2cPollingSimple();
    
   // Set up network connection
   setupNetwork();
@@ -111,31 +114,12 @@ void loop() {
   handleOscMessage();
 
   // Handle I2C Polling for encoders keypresses and encoder key press
-    handleI2c();
-
+    //handleI2c();
+    handleI2cSimple();
 
   // Process touch changes - this function already checks the flag internally
   if (processTouchChanges()) {
-    // Trigger NeoPixel brightness transition on touch change
-    for (int i = 0; i < NUM_FADERS; i++) {
-      Fader& f = faders[i];
-      bool currentTouch = f.touched;
-      static bool previousTouch[NUM_FADERS] = { false };  // Keep previous touch state
-
-      if (currentTouch != previousTouch[i]) {
-        f.brightnessStartTime = millis();
-        f.targetBrightness = currentTouch ? touchedBrightness : baseBrightness;
-
-        debugPrintf("Fader %d → Touch %s → Brightness target = %d", i,
-                    currentTouch ? "TOUCHED" : "released",
-                    f.targetBrightness);
-
-        previousTouch[i] = currentTouch;
-      }
-    }
-    
-    // If true is returned, touch states were updated
-    // Print the current touch states
+    updateBrightnessOnFaderTouchChange();
     printFaderTouchStates();
   }
 

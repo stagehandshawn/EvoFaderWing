@@ -38,7 +38,7 @@ const int numSlaves = sizeof(slaveAddresses) / sizeof(slaveAddresses[0]);
 
 // === Timing Control Variables ===
 unsigned long lastPollTime = 0;          // Timestamp of the last polling cycle
-const unsigned long I2C_POLL_INTERVAL = 1;    // Poll every 1ms (1000Hz) - very responsive
+const unsigned long I2C_POLL_INTERVAL = 5;    // 5ms
 
 // === INITIALIZATION FUNCTION ===
 // Call this inside of your main setup() function
@@ -115,17 +115,39 @@ void pollSlave(uint8_t address, int slaveIndex) {
   // Read the standardized protocol header that all slaves use
   uint8_t dataType = Wire.read();  // First byte: identifies what type of data follows
   uint8_t count = Wire.read();     // Second byte: how many events are in this message
+
+  int remaining = Wire.available();
+
+  if (dataType == DATA_TYPE_ENCODER && remaining < count * 2) {
+    debugPrintf("[WARN] Incomplete encoder packet from slave 0x%02X: expected %d, got %d", address, count * 2, remaining);
+    while (Wire.available()) Wire.read();
+    return;
+  }
+
+  if (dataType == DATA_TYPE_KEYPRESS && remaining < count * 3) {
+    debugPrintf("[WARN] Incomplete keypress packet from slave 0x%02X: expected %d, got %d", address, count * 3, remaining);
+    while (Wire.available()) Wire.read();
+    return;
+  }
+
+  if (count > 32) {
+    debugPrintf("[WARN] Unrealistic count (%d) from slave 0x%02X", count, address);
+    while (Wire.available()) Wire.read();
+    return;
+  }
   
   // Process the data based on its type using the protocol identifier
   switch (dataType) {
     case DATA_TYPE_ENCODER:
       // Handle encoder rotation events (direction and velocity)
       processEncoderData(count, slaveIndex, address);
+      while (Wire.available()) Wire.read(); // Clean up leftovers
       break;
       
     case DATA_TYPE_KEYPRESS:
       // Handle keyboard matrix events (key press and release)
       processKeypressData(count, slaveIndex, address);
+      while (Wire.available()) Wire.read(); // Clean up leftovers
       break;
 
     case DATA_TYPE_RESET:
@@ -158,6 +180,7 @@ void pollSlave(uint8_t address, int slaveIndex) {
         // Clear any remaining bytes to prevent I2C buffer issues
         while (Wire.available()) Wire.read();
       }
+      while (Wire.available()) Wire.read(); // Clean up leftovers
       break;
       
     default:
@@ -193,7 +216,14 @@ void processEncoderData(uint8_t count, int slaveIndex, uint8_t address) {
     uint8_t encoderNumber = encoderWithDir & 0x7F;  // Mask to get lower 7 bits
     bool isPositive = (encoderWithDir & 0x80) != 0; // Check if MSB is set
     
-    // Debug output showing the decoded encoder event
+    if (encoderNumber > 19) {
+      debugPrintf("[WARN] Ignoring invalid encoder number: %d", encoderNumber);
+      continue;
+    }
+    if (velocity > 10) {
+      debugPrintf("[WARN] Ignoring suspicious velocity: %d", velocity);
+      continue;
+    }
     debugPrintf("  Encoder %d: %s%d", encoderNumber, isPositive ? "+" : "-", velocity);
     
     // TODO: Convert encoder event to OSC message and send
@@ -265,3 +295,218 @@ void measurePollingSpeed() {
   // Note: With 5 slaves at 400kHz I2C, total time should be around 2000-3000 microseconds
   // This leaves plenty of time in each 1ms polling cycle for other system operations
 }
+
+
+
+
+
+
+//SIMPLIFIED CODE BELOW!!!
+
+
+
+// === SIMPLIFIED I2C POLLING - ADD TO EXISTING CODE ===
+// Add this to your existing i2cPolling.cpp file
+// Use handleI2cSimple() instead of handleI2c() in your main loop to test
+// All function names are different to avoid conflicts
+
+// === Simplified Timing Variables (separate from original) ===
+unsigned long lastPollTimeSimple = 0;          
+const unsigned long I2C_POLL_INTERVAL_SIMPLE = 5;    // Poll every 5ms instead of 1ms
+
+// === SIMPLIFIED SETUP FUNCTION ===
+// Call this INSTEAD of setupI2cPolling() in your main setup()
+void setupI2cPollingSimple() {
+  Wire.begin();                
+  Wire.setClock(400000);       // 400kHz
+  
+  debugPrint("[MASTER SIMPLE] Simplified I2C polling master started");
+  debugPrintf("Polling %d slaves every %lums...", numSlaves, I2C_POLL_INTERVAL_SIMPLE);
+  
+  for (int i = 0; i < numSlaves; i++) {
+    if (slaveAddresses[i] == I2C_ADDR_KEYBOARD) {
+      debugPrintf("  Slave %d: 0x%02X (Keyboard Matrix)", i, slaveAddresses[i]);
+    } else {
+      debugPrintf("  Slave %d: 0x%02X (Encoder Group)", i, slaveAddresses[i]);
+    }
+  }
+  
+  debugPrint("[INFO SIMPLE] Ready for simplified polling");
+}
+
+// === SIMPLIFIED MAIN POLLING FUNCTION ===
+// Call this INSTEAD of handleI2c() in your main loop()
+void handleI2cSimple() { 
+  unsigned long currentTime = millis();  
+  
+  if (currentTime - lastPollTimeSimple >= I2C_POLL_INTERVAL_SIMPLE) {
+    lastPollTimeSimple = currentTime;  
+    
+    // Poll each slave with extra safety
+    for (int i = 0; i < numSlaves; i++) {
+      pollSlaveSimpleVersion(slaveAddresses[i], i);  
+      delay(1); // Small delay between slave polls
+    }
+  }
+}
+
+// === SIMPLIFIED SLAVE POLLING ===
+void pollSlaveSimpleVersion(uint8_t address, int slaveIndex) {
+  // Clear any leftover data first
+  while (Wire.available()) Wire.read();
+  
+  // Request data from slave
+  uint8_t bytesRequested = 16; // Smaller request size
+  Wire.requestFrom(address, bytesRequested);
+  
+  // Wait a bit for response
+  delay(1);
+  
+  // Check if we got minimum required data
+  if (Wire.available() < 2) {
+    return; // No data or insufficient data
+  }
+  
+  // Read header
+  uint8_t dataType = Wire.read();  
+  uint8_t count = Wire.read();     
+  
+  // Validate data type first
+  if (dataType != DATA_TYPE_ENCODER && 
+      dataType != DATA_TYPE_KEYPRESS && 
+      dataType != DATA_TYPE_RESET) {
+    debugPrintf("[ERROR SIMPLE] Invalid data type 0x%02X from slave 0x%02X", dataType, address);
+    // Clear buffer and return
+    while (Wire.available()) Wire.read();
+    return;
+  }
+  
+  // Validate count
+  if (count > 10) {  // Reasonable maximum
+    debugPrintf("[ERROR SIMPLE] Unrealistic count %d from slave 0x%02X", count, address);
+    while (Wire.available()) Wire.read();
+    return;
+  }
+  
+  // Validate we have enough bytes for the claimed count
+  int bytesPerEvent = (dataType == DATA_TYPE_ENCODER) ? 2 : 3;
+  int expectedBytes = count * bytesPerEvent;
+  
+  if (count > 0 && Wire.available() < expectedBytes) {
+    debugPrintf("[ERROR SIMPLE] Not enough data: need %d, have %d from slave 0x%02X", 
+               expectedBytes, Wire.available(), address);
+    while (Wire.available()) Wire.read();
+    return;
+  }
+  
+  // Additional validation: keyboard should never send encoder data
+  if (address == I2C_ADDR_KEYBOARD && dataType == DATA_TYPE_ENCODER) {
+    debugPrintf("[ERROR SIMPLE] Keyboard slave 0x%02X sent encoder data - corrupted!", address);
+    while (Wire.available()) Wire.read();
+    return;
+  }
+  
+  // Process the validated data
+  switch (dataType) {
+    case DATA_TYPE_ENCODER:
+      processEncoderDataSimpleVersion(count, address);
+      break;
+      
+    case DATA_TYPE_KEYPRESS:
+      processKeypressDataSimpleVersion(count, address);
+      break;
+      
+    case DATA_TYPE_RESET:
+      debugPrint("[RESET SIMPLE] Reset signal received - skipping for now");
+      break;
+  }
+  
+  // Clean up any remaining bytes
+  while (Wire.available()) Wire.read();
+}
+
+// === SIMPLIFIED ENCODER PROCESSING ===
+void processEncoderDataSimpleVersion(uint8_t count, uint8_t address) {
+  if (count == 0) return;
+  
+  debugPrintf("[ENC SIMPLE] Slave 0x%02X: %d encoder events", address, count);
+  
+  for (int i = 0; i < count; i++) {
+    if (Wire.available() < 2) {
+      debugPrint("[ERROR SIMPLE] Not enough encoder data");
+      break;
+    }
+    
+    uint8_t encoderWithDir = Wire.read();  
+    uint8_t velocity = Wire.read();        
+    
+    uint8_t encoderNumber = encoderWithDir & 0x7F;  
+    bool isPositive = (encoderWithDir & 0x80) != 0; 
+    
+    // Validate encoder number and velocity
+    if (encoderNumber > 20) {
+      debugPrintf("[WARN SIMPLE] Invalid encoder number: %d", encoderNumber);
+      continue;
+    }
+    if (velocity > 10) {
+      debugPrintf("[WARN SIMPLE] Invalid velocity: %d", velocity);
+      continue;
+    }
+    
+    debugPrintf("  Encoder %d: %s%d", encoderNumber, isPositive ? "+" : "-", velocity);
+    
+    // TODO: Send OSC message here
+  }
+}
+
+// === SIMPLIFIED KEYPRESS PROCESSING ===
+void processKeypressDataSimpleVersion(uint8_t count, uint8_t address) {
+  if (count == 0) return;
+  
+  debugPrintf("[KEY SIMPLE] Slave 0x%02X: %d key events", address, count);
+  
+  for (int i = 0; i < count; i++) {
+    if (Wire.available() < 3) {
+      debugPrint("[ERROR SIMPLE] Not enough keypress data");
+      break;
+    }
+    
+    uint8_t keyHigh = Wire.read();  
+    uint8_t keyLow = Wire.read();   
+    uint8_t state = Wire.read();    
+    
+    uint16_t keyNumber = (keyHigh << 8) | keyLow;  
+    
+    // Validate key number and state
+    if (keyNumber < 101 || keyNumber > 410) {
+      debugPrintf("[WARN SIMPLE] Invalid key number: %d", keyNumber);
+      continue;
+    }
+    if (state > 1) {
+      debugPrintf("[WARN SIMPLE] Invalid key state: %d", state);
+      continue;
+    }
+    
+    debugPrintf("  Key %d: %s", keyNumber, state ? "PRESSED" : "RELEASED");
+    
+    // TODO: Send OSC message here
+  }
+}
+
+/*
+=== HOW TO USE ===
+
+In your main setup(), replace:
+  setupI2cPolling();
+with:
+  setupI2cPollingSimple();
+
+In your main loop(), replace:
+  handleI2c();
+with:
+  handleI2cSimple();
+
+To switch back to original, just change the function calls back.
+The original functions are still there and unchanged.
+
+*/

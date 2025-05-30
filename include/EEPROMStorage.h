@@ -9,10 +9,10 @@
 //================================
 
 // EEPROM signature constants - Each different data type gets its own signature byte
-#define EEPROM_SIGNATURE 0xA5           // Original signature for fader calibration
-#define EEPROM_CONFIG_SIGNATURE 0xB6    // Signature for fader configuration
+#define CALCFG_EEPROM_SIGNATURE 0xA5    // Signature for fader calibration
+#define FADERCFG_EEPROM_SIGNATURE 0xB6    // Signature for fader configuration
 #define NETCFG_EEPROM_SIGNATURE 0x5A    // Signature for network config
-#define EEPROM_TOUCH_SIGNATURE 0xC7     // Signature for touch sensor configuration
+#define TOUCHCFG_EEPROM_SIGNATURE 0xC7     // Signature for touch sensor configuration
 
 // EEPROM address map with defined layout to ensure organized storage
 #define EEPROM_CAL_START 0              // Start of calibration section (original location)
