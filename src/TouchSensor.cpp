@@ -336,10 +336,10 @@ void clearTouchError() {
 void printFaderTouchStates() {
   debugPrint("Fader Touch States:");
   for (int i = 0; i < NUM_FADERS; i++) {
-    debugPrintf("  Fader %d: %s", i, faders[i].touched ? "TOUCHED" : "released");
-    
     if (faders[i].touched) {
-      debugPrintf(" (%lums)", faders[i].touchDuration);
+      debugPrintf("  Fader %d: TOUCHED (%lums)", i, faders[i].touchDuration);
+    } else {
+      debugPrintf("  Fader %d: released", i);
     }
   }
 }

@@ -60,7 +60,7 @@ NetworkConfig netConfig = {
 //================================
 // Used to control LED brightness on idle vs. touch, and animate fades.
 uint8_t baseBrightness = 40;
-uint8_t touchedBrightness = 255;
+uint8_t touchedBrightness = 155;
 unsigned long fadeTime = 1000;  // Duration in ms for brightness fade animation
 
 //================================

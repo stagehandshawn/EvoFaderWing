@@ -12,6 +12,13 @@
 void debugPrint(const char* message);
 void debugPrintf(const char* format, ...);
 
+
+//================================
+// UPLOAD FUNCTION
+//================================
+void checkSerialForReboot();   //Allow us to upload without pressing physical button
+
+
 //================================
 // IP ADDRESS UTILITIES
 //================================

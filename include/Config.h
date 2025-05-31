@@ -42,7 +42,7 @@
 
 // NeoPixel configuration
 #define NEOPIXEL_PIN 40
-#define PIXELS_PER_FADER 1
+#define PIXELS_PER_FADER 10
 #define NUM_PIXELS (NUM_FADERS * PIXELS_PER_FADER)
 
 // Touch sensor configuration

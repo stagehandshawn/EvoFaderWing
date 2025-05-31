@@ -63,3 +63,35 @@ String getParam(String data, const char* key) {
   if (end == -1) end = data.length();
   return data.substring(start, end);
 }
+
+//================================
+// UPLOAD Function 
+//================================
+//Upload without pressing button, using python script, it does not fully upload cant get it working but it puts into bootloader so we can manually press upload
+void checkSerialForReboot() {
+    if (Serial.available()) {
+        String cmd = Serial.readStringUntil('\n');
+        cmd.trim(); // Remove any whitespace/newlines
+        
+        if (cmd == "REBOOT_BOOTLOADER") {
+            Serial.println("[REBOOT] Command received. Entering bootloader...");
+            Serial.flush(); // Important: ensure message is sent before reboot
+            delay(100);
+            
+            // This is the correct method for ALL Teensy models
+            _reboot_Teensyduino_();
+            
+        } else if (cmd == "REBOOT_NORMAL") {
+            Serial.println("[REBOOT] Normal reboot requested...");
+            Serial.flush();
+            delay(100);
+            
+            // Normal restart using ARM AIRCR register
+            SCB_AIRCR = 0x05FA0004;
+            
+        } else {
+            Serial.print("[REBOOT] Unknown command: ");
+            Serial.println(cmd);
+        }
+    }
+}

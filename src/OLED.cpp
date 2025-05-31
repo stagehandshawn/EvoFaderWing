@@ -437,8 +437,8 @@ void OLED::addDebugLine(const char* text) {
 
     // Draw bottom lines
     for (int i = 0; i < MAX_DEBUG_LINES; i++) {
-        clearLine(4 + i);
-        setCursor(0, (4 + i) * CHAR_HEIGHT_SMALL);
+        clearLine(3 + i);
+        setCursor(0, (3 + i) * CHAR_HEIGHT_SMALL);
         setTextSize(TEXT_SIZE_SMALL);
         setTextColor(SSD1306_WHITE);
         oledDisplay->print(debugLines[i]);

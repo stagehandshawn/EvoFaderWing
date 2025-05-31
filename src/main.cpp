@@ -135,5 +135,10 @@ void loop() {
     clearTouchError();
   }
 
+  if (debugMode) {
+      checkSerialForReboot();
+  }
+
   yield(); // Let the Teensy do background tasks
 }
+

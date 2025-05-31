@@ -40,9 +40,9 @@ void initializeFaders() {
     faders[i].lastSentOscValue = -1;
     
     // Initialize color
-    faders[i].red = 60;
+    faders[i].red = 0;
     faders[i].green = 60;
-    faders[i].blue = 60;
+    faders[i].blue = 0;
     faders[i].colorUpdated = true;
 
     // Initialize touch timing values
