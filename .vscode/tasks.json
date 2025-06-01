@@ -8,21 +8,10 @@
       "problemMatcher": []
     },
     {
-      "label": "Teensy Bootloader Mode",
+      "label": "Teensy Auto Upload",
       "type": "shell",
-      "command": "python3",
-      "args": ["teensy_bootloader_mode.py"],
-      "problemMatcher": [],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "presentation": {
-        "echo": true,
-        "reveal": "always",
-        "focus": false,
-        "panel": "shared"
-      }
+      "command": "/Users/shawn/.platformio/penv/bin/platformio run && python3 teensy_auto_upload.py",
+      "problemMatcher": []
     }
   ]
 }
