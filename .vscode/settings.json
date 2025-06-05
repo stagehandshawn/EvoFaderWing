@@ -1,0 +1,9 @@
+{
+  "C_Cpp.default.configurationProvider": "platformio.platformio-ide",
+  "C_Cpp.intelliSenseEngine": "default",
+  "C_Cpp.default.intelliSenseMode": "gcc-x64",
+  "C_Cpp.errorSquiggles": "enabled",
+  "files.associations": {
+    "*.ino": "cpp"
+  }
+}

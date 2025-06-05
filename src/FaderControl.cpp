@@ -82,10 +82,10 @@ void configureFaderPins() {
     
     // Setup PID controller with loaded configuration
     f.pidController = new PID(&f.smoothedPosition, &f.motorOutput, &f.setpoint, 
-                            config.pidKp, config.pidKi, config.pidKd, DIRECT);
+                            Fconfig.pidKp, Fconfig.pidKi, Fconfig.pidKd, DIRECT);
     f.pidController->SetMode(AUTOMATIC);
     f.pidController->SetSampleTime(PID_SAMPLE_TIME);
-    f.pidController->SetOutputLimits(-config.defaultPwm, config.defaultPwm);
+    f.pidController->SetOutputLimits(-Fconfig.defaultPwm, Fconfig.defaultPwm);
     
     // Initialize state
     f.state = FADER_IDLE;
@@ -127,7 +127,7 @@ void updateFaderState(Fader& f) {
       
     case FADER_MOVING:
       // Check if we've reached the target
-      if (abs(f.smoothedPosition - f.setpoint) <= config.targetTolerance) {
+      if (abs(f.smoothedPosition - f.setpoint) <= Fconfig.targetTolerance) {
         f.state = FADER_IDLE;
         debugPrintf("Fader state: MOVING → IDLE (target reached)\n");
         
@@ -160,8 +160,8 @@ void driveMotor(Fader& f, double pwmOut) {
   int pwm = 0;
   if (abs(pwmOut) > 0) {
     // If output is non-zero, apply minimum PWM needed to overcome motor inertia
-    pwm = map(abs(pwmOut), 0, config.defaultPwm, config.motorDeadzone, config.defaultPwm);
-    pwm = constrain(pwm, config.motorDeadzone, config.defaultPwm);
+    pwm = map(abs(pwmOut), 0, Fconfig.defaultPwm, Fconfig.motorDeadzone, Fconfig.defaultPwm);
+    pwm = constrain(pwm, Fconfig.motorDeadzone, Fconfig.defaultPwm);
   }
   
   // Set direction pins based on desired direction
@@ -191,7 +191,7 @@ void handleFaders() {
     f.smoothedPosition = readSmoothedPosition(f);
     
     // Check for significant movement (for reporting)
-    if (abs(f.smoothedPosition - f.lastReportedValue) >= config.sendTolerance) {
+    if (abs(f.smoothedPosition - f.lastReportedValue) >= Fconfig.sendTolerance) {
       f.lastReportedValue = f.smoothedPosition;
       
       // Map the current position to 0-127 for OSC
@@ -238,7 +238,7 @@ void handleFaders() {
 //================================
 
 void calibrateFaders() {
-  debugPrintf("Calibration started at PWM: %d\n", config.calibratePwm);
+  debugPrintf("Calibration started at PWM: %d\n", Fconfig.calibratePwm);
   for (int i = 0; i < NUM_FADERS; i++) {
     Fader& f = faders[i];
     
@@ -247,7 +247,7 @@ void calibrateFaders() {
     
     // ==================== MAX VALUE CALIBRATION ====================
     debugPrintf("Fader %d → Calibrating Max...\n", i);
-    analogWrite(f.pwmPin, config.calibratePwm);
+    analogWrite(f.pwmPin, Fconfig.calibratePwm);
     digitalWrite(f.dirPin1, HIGH); digitalWrite(f.dirPin2, LOW);
     int last = 0, plateau = 0;
     
@@ -285,7 +285,7 @@ void calibrateFaders() {
 
     // ==================== MIN VALUE CALIBRATION ====================
     debugPrint("→ Calibrating Min...");
-    analogWrite(f.pwmPin, config.calibratePwm);
+    analogWrite(f.pwmPin, Fconfig.calibratePwm);
     digitalWrite(f.dirPin1, LOW); digitalWrite(f.dirPin2, HIGH);
     plateau = 0;
     
@@ -375,7 +375,7 @@ void moveFaderToSetpoint(Fader& f) {
     f.smoothedPosition = readSmoothedPosition(f);
 
     // Check if at target
-    if (abs(f.smoothedPosition - f.setpoint) <= config.targetTolerance) {
+    if (abs(f.smoothedPosition - f.setpoint) <= Fconfig.targetTolerance) {
       driveMotor(f, 0);
       break;
     }

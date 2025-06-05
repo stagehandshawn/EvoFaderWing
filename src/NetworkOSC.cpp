@@ -87,7 +87,7 @@ void handleOscMovement(const char *address, int value) {
         // Map the incoming 0-127 value to the fader's analog range
         int newSetpoint = map(value, 0, 127, f.minVal, f.maxVal);
 
-        if (abs(newSetpoint - f.setpoint) > config.targetTolerance) {
+        if (abs(newSetpoint - f.setpoint) > Fconfig.targetTolerance) {
           f.setpoint = newSetpoint;
           debugPrintf("OSC IN → Fader %d (%s) = %d, setpoint = %.1f\n", i, address, value, f.setpoint);
           moveFaderToSetpoint(f);

@@ -248,8 +248,8 @@ void handleCalibrationSettings(String request) {
   debugPrint("Handling calibration settings...");
   
   // Extract and parse calibration parameters
-  config.calibratePwm = getParam(request, "calib_pwm").toInt();
-  debugPrintf("Calibration PWM saved: %d\n", config.calibratePwm);
+  Fconfig.calibratePwm = getParam(request, "calib_pwm").toInt();
+  debugPrintf("Calibration PWM saved: %d\n", Fconfig.calibratePwm);
   
   // Save to EEPROM
   saveFaderConfig();
@@ -262,15 +262,15 @@ void handlePIDSettings(String request) {
   debugPrint("Handling PID settings...");
   
   // Extract and parse PID parameters only
-  config.pidKp = getParam(request, "pidKp").toFloat();
-  config.pidKi = getParam(request, "pidKi").toFloat();
-  config.pidKd = getParam(request, "pidKd").toFloat();
+  Fconfig.pidKp = getParam(request, "pidKp").toFloat();
+  Fconfig.pidKi = getParam(request, "pidKi").toFloat();
+  Fconfig.pidKd = getParam(request, "pidKd").toFloat();
   
   // Update PID controllers with new values
   for (int i = 0; i < NUM_FADERS; i++) {
-    faders[i].pidController->SetTunings(config.pidKp, config.pidKi, config.pidKd);
+    faders[i].pidController->SetTunings(Fconfig.pidKp, Fconfig.pidKi, Fconfig.pidKd);
     // Keep the output limits (using existing config.defaultPwm)
-    faders[i].pidController->SetOutputLimits(-config.defaultPwm, config.defaultPwm);
+    faders[i].pidController->SetOutputLimits(-Fconfig.defaultPwm, Fconfig.defaultPwm);
   }
   
   // Save to EEPROM
@@ -284,14 +284,14 @@ void handleFaderSettings(String request) {
   debugPrint("Handling fader settings...");
   
   // Extract and parse fader parameters
-  config.motorDeadzone = getParam(request, "motorDeadzone").toInt();
-  config.defaultPwm = getParam(request, "defaultPwm").toInt();
-  config.targetTolerance = getParam(request, "targetTolerance").toInt();
-  config.sendTolerance = getParam(request, "sendTolerance").toInt();
+  Fconfig.motorDeadzone = getParam(request, "motorDeadzone").toInt();
+  Fconfig.defaultPwm = getParam(request, "defaultPwm").toInt();
+  Fconfig.targetTolerance = getParam(request, "targetTolerance").toInt();
+  Fconfig.sendTolerance = getParam(request, "sendTolerance").toInt();
   
   // Update PID output limits with new defaultPwm
   for (int i = 0; i < NUM_FADERS; i++) {
-    faders[i].pidController->SetOutputLimits(-config.defaultPwm, config.defaultPwm);
+    faders[i].pidController->SetOutputLimits(-Fconfig.defaultPwm, Fconfig.defaultPwm);
   }
   
   // Save to EEPROM
@@ -432,16 +432,16 @@ void handleRoot() {
   // Fader settings
   html += "<fieldset><legend>Fader Settings</legend>";
   html += "<form method='get' action='/save'>";
-  html += "<label>Motor Deadzone: <input type='number' name='motorDeadzone' value='" + String(config.motorDeadzone) + "'>";
+  html += "<label>Motor Deadzone: <input type='number' name='motorDeadzone' value='" + String(Fconfig.motorDeadzone) + "'>";
   html += "<small>Minimum error allowed before motor stops (prevents jitter).</small></label>";
 
-  html += "<label>Default PWM: <input type='number' name='defaultPwm' value='" + String(config.defaultPwm) + "'>";
+  html += "<label>Default PWM: <input type='number' name='defaultPwm' value='" + String(Fconfig.defaultPwm) + "'>";
   html += "<small>Base speed used for fader movement (range: 0–255).</small></label>";
 
-  html += "<label>Target Tolerance: <input type='number' name='targetTolerance' value='" + String(config.targetTolerance) + "'>";
+  html += "<label>Target Tolerance: <input type='number' name='targetTolerance' value='" + String(Fconfig.targetTolerance) + "'>";
   html += "<small>How close to target position before stopping the motor.</small></label>";
 
-  html += "<label>Send Tolerance: <input type='number' name='sendTolerance' value='" + String(config.sendTolerance) + "'>";
+  html += "<label>Send Tolerance: <input type='number' name='sendTolerance' value='" + String(Fconfig.sendTolerance) + "'>";
   html += "<small>How much the fader must move before sending OSC update.</small></label>";
 
   html += "<input type='submit' value='Save Fader Settings'>";
@@ -450,13 +450,13 @@ void handleRoot() {
   // PID Configuration Subsection
   html += "<legend>PID Configuration</legend>";
   html += "<form method='get' action='/save'>";
-  html += "<label>P Gain: <input type='number' step='0.1' name='pidKp' value='" + String(config.pidKp) + "'>";
+  html += "<label>P Gain: <input type='number' step='0.1' name='pidKp' value='" + String(Fconfig.pidKp) + "'>";
   html += "<small>Proportional gain — how strongly the fader reacts to error.</small></label>";
 
-  html += "<label>I Gain: <input type='number' step='0.1' name='pidKi' value='" + String(config.pidKi) + "'>";
+  html += "<label>I Gain: <input type='number' step='0.1' name='pidKi' value='" + String(Fconfig.pidKi) + "'>";
   html += "<small>Integral gain — helps correct steady errors over time.</small></label>";
 
-  html += "<label>D Gain: <input type='number' step='0.01' name='pidKd' value='" + String(config.pidKd) + "'>";
+  html += "<label>D Gain: <input type='number' step='0.01' name='pidKd' value='" + String(Fconfig.pidKd) + "'>";
   html += "<small>Derivative gain — helps dampen fast changes.</small></label>";
 
   html += "<input type='submit' value='Save PID Settings'>";
@@ -465,7 +465,7 @@ void handleRoot() {
   // Calibration PWM Subsection
   html += "<legend>Calibration Settings</legend>";
   html += "<form method='get' action='/save'>";
-  html += "<label>Calibration PWM: <input name='calib_pwm' type='number' value='" + String(config.calibratePwm) + "'>";
+  html += "<label>Calibration PWM: <input name='calib_pwm' type='number' value='" + String(Fconfig.calibratePwm) + "'>";
   html += "<small>Motor speed during calibration — low value for gentle sweep.</small></label>";
   html += "<input type='submit' value='Save Calibration Settings'>";
   html += "</form>";

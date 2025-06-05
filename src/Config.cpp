@@ -27,7 +27,7 @@ const uint16_t OSC_IDS[NUM_FADERS] = {201, 202, 203, 204, 205, 206, 207, 208, 20
 // FADER BEHAVIOR CONFIGURATION
 //================================
 // Default PID and motor tuning settings shared across all faders.
-FaderConfig config = {
+FaderConfig Fconfig = {
   .pidKp = PID_KP,
   .pidKi = PID_KI,
   .pidKd = PID_KD,

@@ -187,7 +187,7 @@ extern Fader faders[NUM_FADERS];
 
 // Configuration instances
 extern NetworkConfig netConfig;
-extern FaderConfig config;
+extern FaderConfig Fconfig;
 
 // Touch sensor globals
 extern int autoCalibrationMode;

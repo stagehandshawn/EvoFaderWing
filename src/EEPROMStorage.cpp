@@ -49,7 +49,7 @@ void saveFaderConfig() {
   EEPROM.write(EEPROM_CONFIG_SIGNATURE_ADDR, FADERCFG_EEPROM_SIGNATURE);
   
   // Write configuration (primitive types only)
-  EEPROM.put(EEPROM_CONFIG_DATA_ADDR, config);
+  EEPROM.put(EEPROM_CONFIG_DATA_ADDR, Fconfig);
   
   debugPrint("Fader configuration saved to EEPROM.");
 }
@@ -58,7 +58,7 @@ void loadConfig() {
   // Check signature
   if (EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR) == FADERCFG_EEPROM_SIGNATURE) {
     // Load configuration
-    EEPROM.get(EEPROM_CONFIG_DATA_ADDR, config);
+    EEPROM.get(EEPROM_CONFIG_DATA_ADDR, Fconfig);
     debugPrint("Fader configuration loaded from EEPROM.");
   } else {
     debugPrint("No valid fader configuration in EEPROM, using defaults.");
@@ -190,19 +190,19 @@ void saveAllConfig() {
 
 void resetToDefaults() {
   // Reset config to defaults using the macro values
-  config.pidKp = PID_KP;
-  config.pidKi = PID_KI;
-  config.pidKd = PID_KD;
-  config.motorDeadzone = MOTOR_DEADZONE;
-  config.defaultPwm = DEFAULT_PWM;
-  config.calibratePwm = CALIB_PWM;
-  config.targetTolerance = TARGET_TOLERANCE;
-  config.sendTolerance = SEND_TOLERANCE;
+  Fconfig.pidKp = PID_KP;
+  Fconfig.pidKi = PID_KI;
+  Fconfig.pidKd = PID_KD;
+  Fconfig.motorDeadzone = MOTOR_DEADZONE;
+  Fconfig.defaultPwm = DEFAULT_PWM;
+  Fconfig.calibratePwm = CALIB_PWM;
+  Fconfig.targetTolerance = TARGET_TOLERANCE;
+  Fconfig.sendTolerance = SEND_TOLERANCE;
   
   // Apply reset PID settings to controllers
   for (int i = 0; i < NUM_FADERS; i++) {
-    faders[i].pidController->SetTunings(config.pidKp, config.pidKi, config.pidKd);
-    faders[i].pidController->SetOutputLimits(-config.defaultPwm, config.defaultPwm);
+    faders[i].pidController->SetTunings(Fconfig.pidKp, Fconfig.pidKi, Fconfig.pidKd);
+    faders[i].pidController->SetOutputLimits(-Fconfig.defaultPwm, Fconfig.defaultPwm);
   }
   
   // Reset touch settings
@@ -337,16 +337,16 @@ void dumpEepromConfig() {
     EEPROM.get(EEPROM_CONFIG_DATA_ADDR, storedConfig);
     
     debugPrintf("PID P Gain: Current=%.3f, Stored=%.3f %s\n", 
-               config.pidKp, storedConfig.pidKp, 
-               (abs(config.pidKp - storedConfig.pidKp) < 0.001) ? "" : "!!!");
+               Fconfig.pidKp, storedConfig.pidKp, 
+               (abs(Fconfig.pidKp - storedConfig.pidKp) < 0.001) ? "" : "!!!");
     
     debugPrintf("PID I Gain: Current=%.3f, Stored=%.3f %s\n", 
-               config.pidKi, storedConfig.pidKi,
-               (abs(config.pidKi - storedConfig.pidKi) < 0.001) ? "" : "!!!");
+               Fconfig.pidKi, storedConfig.pidKi,
+               (abs(Fconfig.pidKi - storedConfig.pidKi) < 0.001) ? "" : "!!!");
     
     debugPrintf("PID D Gain: Current=%.3f, Stored=%.3f %s\n", 
-               config.pidKd, storedConfig.pidKd,
-               (abs(config.pidKd - storedConfig.pidKd) < 0.001) ? "" : "!!!");
+               Fconfig.pidKd, storedConfig.pidKd,
+               (abs(Fconfig.pidKd - storedConfig.pidKd) < 0.001) ? "" : "!!!");
   }
   
   debugPrint("\n===== END OF EEPROM DUMP =====\n");

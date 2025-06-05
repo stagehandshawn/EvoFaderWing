@@ -71,7 +71,7 @@ void setup() {
   // Initialize faders
   initializeFaders();
   configureFaderPins();
-
+  
   // Initialize Touch MPR121 
   if (!setupTouch()) {
     debugPrint("Touch sensor initialization failed!");
