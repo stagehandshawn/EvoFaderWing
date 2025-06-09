@@ -20,6 +20,14 @@ extern EthernetClient client;
 // FUNCTION DECLARATIONS
 //================================
 
+// New OSC settings handler
+void handleOSCSettings(String request);
+
+// Validation functions
+bool isValidIP(IPAddress ip);
+bool isValidPort(int port);
+void sendErrorResponse(const char* errorMsg);
+
 // Server management
 void startWebServer();
 void pollWebServer();
@@ -36,6 +44,7 @@ void handleRunCalibration();
 void handleDebugToggle(String requestBody);
 void handleResetDefaults();
 void handleNetworkReset();
+void handleStatsPage();
 
 // Response helpers
 void send404Response();

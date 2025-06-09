@@ -282,7 +282,7 @@ void calibrateFaders() {
       // If we reach this point with required plateau count, calibration succeeded
       if (plateau >= PLATEAU_COUNT) {
         calibrationSuccess = true;
-        f.maxVal = last;
+        f.maxVal = last - 5;  //subtract a litle value to make sure we can get to top
       }
     }
     
@@ -320,7 +320,7 @@ void calibrateFaders() {
       // If we reach this point with required plateau count, calibration succeeded
       if (plateau >= PLATEAU_COUNT) {
         minCalibrationSuccess = true;
-        f.minVal = last;
+        f.minVal = last + 5;  //Add a litle value to make sure we can get to bottom
       }
     }
     

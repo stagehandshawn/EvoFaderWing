@@ -2,6 +2,7 @@
 #include "TouchSensor.h"
 #include "Utils.h"
 #include <EEPROM.h>
+#include "FaderControl.h"
 
 //================================
 // CALIBRATION FUNCTIONS
@@ -29,9 +30,9 @@ void loadCalibration() {
 void checkCalibration() {
   if (EEPROM.read(EEPROM_CAL_SIGNATURE_ADDR) != CALCFG_EEPROM_SIGNATURE) {
     debugPrint("Running calibration...");
-    // Note: calibrateFaders() is in FaderControl module
-    // calibrateFaders();
-    // manualTouchCalibration();   // Also recalibrate touch sensor
+    calibrateFaders();
+    //manualTouchCalibration();   // Also recalibrate touch sensor
+
     saveCalibration();
     saveTouchConfig();          // Save default touch configuration as well
   } else {
@@ -175,6 +176,7 @@ void loadAllConfig() {
   loadConfig();          // Load fader configuration
   loadNetworkConfig();   // Load network configuration
   loadTouchConfig();     // Load touch sensor configuration
+  loadCalibration();
 }
 
 void saveAllConfig() {
@@ -182,6 +184,7 @@ void saveAllConfig() {
   saveFaderConfig();     // Save fader configuration
   saveNetworkConfig();   // Save network configuration
   saveTouchConfig();     // Save touch sensor configuration
+  saveCalibration();
 }
 
 //================================
@@ -233,7 +236,7 @@ void resetNetworkDefaults() {
   saveNetworkConfig();
   
    displayIPAddress();
-   
+
   debugPrint("Network settings reset to defaults");
 }
 

@@ -77,6 +77,9 @@ void setup() {
     debugPrint("Touch sensor initialization failed!");
   }
 
+    // Check calibration will load calibration data if present ortherwise it will run calibration
+  checkCalibration(); 
+
   // Load configurations from EEPROM
   loadAllConfig();
 
