@@ -88,6 +88,10 @@ uint8_t touchThreshold = 12;     // Higher = less sensitive
 uint8_t releaseThreshold = 6;    // Lower = harder to release
 
 
+//Network reset check
+bool checkForReset = true;
+unsigned long resetCheckStartTime = 0;
+
 //================================
 // I2C POLLING VARIABLES
 //================================

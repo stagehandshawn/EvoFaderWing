@@ -88,7 +88,7 @@ enum FaderState {
 //================================
 constexpr uint32_t kDHCPTimeout = 15000;  // Timeout for DHCP in milliseconds
 constexpr uint16_t kOSCPort = 8000;       // Default OSC port
-constexpr char kServiceName[] = "osc-fader"; // mDNS service name
+constexpr char kServiceName[] = "gma3-faderwing"; // mDNS service name
 
 // Network configuration structure
 struct NetworkConfig {
@@ -193,6 +193,12 @@ extern FaderConfig Fconfig;
 extern int autoCalibrationMode;
 extern uint8_t touchThreshold;
 extern uint8_t releaseThreshold;
+
+// Network reset check
+extern bool checkForReset;
+extern unsigned long resetCheckStartTime;
+
+void displayIPAddress();
 
 // Debug setting
 extern bool debugMode;

@@ -91,10 +91,12 @@ void setup() {
   setupNetwork();
 
 
-  display.clear();
-  // Show IP address
-  currentIP = Ethernet.localIP();
-  display.showIPAddress(currentIP);
+  // display.clear();
+  // // Show IP address
+  // currentIP = Ethernet.localIP();
+  // display.showIPAddress(currentIP);
+
+   displayIPAddress();
 
   // Start web server for configuration
   startWebServer();
@@ -104,11 +106,20 @@ void setup() {
 
   // Check if we need to run calibration
   // checkCalibration();  // COMMENTED OUT FOR TESTING - REENABLE WHEN NEEDED
-   
+  
+  //Network reset check
+  resetCheckStartTime = millis();
+
   debugPrint("Initialization complete");
 }
 
 void loop() {
+  // Network reset check exiry
+  if (checkForReset && (millis() - resetCheckStartTime > 5000)) {
+    checkForReset = false;
+    debugPrint("[RESET] Reset check window expired.");
+  }
+  
   // Check for web requests
   pollWebServer();
   
@@ -145,3 +156,11 @@ void loop() {
   yield(); // Let the Teensy do background tasks
 }
 
+void displayIPAddress(){
+
+  display.clear();
+  // Show IP address
+  currentIP = Ethernet.localIP();
+  display.showIPAddress(currentIP);
+
+}

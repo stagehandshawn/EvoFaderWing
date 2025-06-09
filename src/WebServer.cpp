@@ -386,7 +386,8 @@ void handleRoot() {
   html += ".main { display: flex; flex-direction: row; padding: 20px; }";
   html += ".left, .right { padding: 20px; }";
   html += ".left { flex: 1 1 60%; max-width: 600px; }";
-  html += ".right { flex: 1 1 40%; min-width: 300px; background-color: #f9f9f9; border-left: 1px solid #ccc; }";
+  //html += ".right { flex: 1 1 40%; min-width: 300px; background-color: #f9f9f9; border-left: 1px solid #ccc; }";
+  html += ".right { flex: 1 1 40%; min-width: 300px; background-color: #f9f9f9; border-left: 1px solid #ccc; overflow-y: auto; max-height: 90vh; }";
   html += "fieldset { margin-bottom: 20px; border: 1px solid #ccc; padding: 10px; }";
   html += "legend { font-weight: bold; }";
   html += "label { display: block; margin-top: 10px; }";
@@ -519,14 +520,28 @@ void handleRoot() {
   // RIGHT FADER STATUS PANEL
   html += "<div class='right'>";
   html += "<fieldset><legend>Fader Status</legend>";
+
+
+  // for (int i = 0; i < NUM_FADERS; i++) {
+  //   Fader& f = faders[i];
+  //   html += "<p><b>Fader " + String(i) + ":</b><br>";
+  //   html += "Min: " + String(f.minVal) + "<br>";
+  //   html += "Max: " + String(f.maxVal) + "<br>";
+  //   html += "Current: " + String((int)f.smoothedPosition) + "<br>";
+  //   html += "State: " + String(f.state) + "</p><hr>";
+  // }
+
   for (int i = 0; i < NUM_FADERS; i++) {
     Fader& f = faders[i];
-    html += "<p><b>Fader " + String(i) + ":</b><br>";
-    html += "Min: " + String(f.minVal) + "<br>";
-    html += "Max: " + String(f.maxVal) + "<br>";
-    html += "Current: " + String((int)f.smoothedPosition) + "<br>";
-    html += "State: " + String(f.state) + "</p><hr>";
+    html += "<div class='fader-status'>";
+    html += "<h4>Fader " + String(i) + "</h4>";
+    html += "<div class='fader-info'>";
+    html += "Min: " + String(f.minVal) + " | Max: " + String(f.maxVal) + "<br>";
+    html += "Current: " + String((int)f.smoothedPosition) + " | State: " + String(f.state);
+    html += "</div></div>";
   }
+
+
   html += "</fieldset>";
   html += "</div>"; // END RIGHT
 

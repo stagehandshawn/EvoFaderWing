@@ -80,8 +80,8 @@ print("[RESET] Waiting for bootloader to fully initialize May need to unplug and
 for i in range(20):  # 8 seconds worth of dots (0.1s each)
     time.sleep(0.1)
     print(".", end="", flush=True)
-print(" ✓")
 
+print(" ✓")
 print("[RESET] Bootloader should now be ready for programming...")
 
 # ------------------ UPLOAD HEX (WITH RETRY) ------------------

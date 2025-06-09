@@ -232,6 +232,8 @@ void resetNetworkDefaults() {
   // Save to EEPROM
   saveNetworkConfig();
   
+   displayIPAddress();
+   
   debugPrint("Network settings reset to defaults");
 }
 

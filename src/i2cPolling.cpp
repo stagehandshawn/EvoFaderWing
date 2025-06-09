@@ -494,6 +494,14 @@ void processKeypressDataSimpleVersion(uint8_t count, uint8_t address) {
     
     debugPrintf("  Key %d: %s", keyNumber, state ? "PRESSED" : "RELEASED");
     
+        // Check for reset condition: key 401 pressed during startup window
+    if (checkForReset && keyNumber == 401 && state == 1) {
+      debugPrint("[NETWORK RESET]");
+      resetNetworkDefaults();
+      checkForReset = false;  // Prevent multiple resets
+      return;  // Skip further processing of this event
+    }
+
 
     // placeholder: Handle key press or release for OSC sending
     if (state == 1) {
