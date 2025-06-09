@@ -76,7 +76,7 @@ except Exception as e:
     print("[RESET] ⚠ Proceeding with upload anyway...")
 
 # Wait for bootloader to be ready
-print("[RESET] Waiting for bootloader to fully initialize", end="", flush=True)
+print("[RESET] Waiting for bootloader to fully initialize May need to unplug and replug usb", end="", flush=True)
 for i in range(20):  # 8 seconds worth of dots (0.1s each)
     time.sleep(0.1)
     print(".", end="", flush=True)

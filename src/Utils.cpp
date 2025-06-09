@@ -67,7 +67,7 @@ String getParam(String data, const char* key) {
 //================================
 // UPLOAD Function 
 //================================
-//Upload without pressing button, using python script, it does not fully upload cant get it working but it puts into bootloader so we can manually press upload
+//Upload without pressing button, using python script, takes one second try
 void checkSerialForReboot() {
     if (Serial.available()) {
         String cmd = Serial.readStringUntil('\n');

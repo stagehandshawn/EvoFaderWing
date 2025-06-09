@@ -70,9 +70,9 @@ void setupNeoPixels() {
 
   // Initialize color values in faders
   for (int i = 0; i < NUM_FADERS; i++) {
-    faders[i].red = 0;     // Default to dim white
-    faders[i].green = 10;
-    faders[i].blue = 0;
+    faders[i].red = 255;     // white
+    faders[i].green = 255;
+    faders[i].blue = 255;
     faders[i].colorUpdated = true;  // Force initial update
   }
 }

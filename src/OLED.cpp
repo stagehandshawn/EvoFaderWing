@@ -27,20 +27,20 @@ OLED::~OLED() {
 
 bool OLED::begin() {
     // Try to auto-detect the display address by testing common addresses
-    debugPrint("[OLED] Auto-detecting display address...");
+    debugPrint("[OLED] Auto-detect...");
     
     // Test primary address first (most common for your blue/yellow displays)
     if (testAddress(OLED_ADDR_PRIMARY)) {
         i2cAddress = OLED_ADDR_PRIMARY;
-        debugPrintf("[OLED] Display found at primary address 0x%02X", i2cAddress);
+        debugPrintf("[OLED] Found 0x%02X", i2cAddress);
     }
     // Test secondary address if primary failed
     else if (testAddress(OLED_ADDR_SECONDARY)) {
         i2cAddress = OLED_ADDR_SECONDARY;
-        debugPrintf("[OLED] Display found at secondary address 0x%02X", i2cAddress);
+        debugPrintf("[OLED] Found 0x%02X", i2cAddress);
     }
     else {
-        debugPrint("[OLED] ERROR: No display found at any address");
+        debugPrint("[OLED] ERR: No display");
         return false;
     }
     
@@ -49,7 +49,7 @@ bool OLED::begin() {
     
     // Initialize the display using Adafruit library
     if (!oledDisplay->begin(SSD1306_SWITCHCAPVCC, i2cAddress)) {
-        debugPrint("[OLED] ERROR: SSD1306 allocation failed");
+        debugPrint("[OLED] ERR: alloc failed");
         delete oledDisplay;
         oledDisplay = nullptr;
         return false;
@@ -62,13 +62,13 @@ bool OLED::begin() {
     oledDisplay->cp437(true);                       // Use full 256 character 'Code Page 437' font
     
     displayInitialized = true;
-    debugPrint("[OLED] Display initialized successfully using Adafruit library");
+    debugPrint("[OLED] Init ok");
     return true;
 }
 
 bool OLED::begin(uint8_t address) {
     // Initialize with user-specified address
-    debugPrintf("[OLED] Initializing display at specified address 0x%02X", address);
+    debugPrintf("[OLED] Init at 0x%02X", address);
     
     if (testAddress(address)) {
         i2cAddress = address;
@@ -78,7 +78,7 @@ bool OLED::begin(uint8_t address) {
         
         // Initialize the display using Adafruit library
         if (!oledDisplay->begin(SSD1306_SWITCHCAPVCC, i2cAddress)) {
-            debugPrint("[OLED] ERROR: SSD1306 allocation failed");
+            debugPrint("[OLED] ERR: alloc failed");
             delete oledDisplay;
             oledDisplay = nullptr;
             return false;
@@ -91,10 +91,10 @@ bool OLED::begin(uint8_t address) {
         oledDisplay->cp437(true);
         
         displayInitialized = true;
-        debugPrint("[OLED] Display initialized successfully");
+        debugPrint("[OLED] Init ok");
         return true;
     } else {
-        debugPrintf("[OLED] ERROR: No display found at address 0x%02X", address);
+        debugPrintf("[OLED] ERR: No dsp at 0x%02X", address);
         return false;
     }
 }
@@ -322,12 +322,12 @@ void OLED::setupOLED() {
     // Complete OLED setup function - call this from your main setup()
     // Handles initialization, error checking, and welcome display
     
-    debugPrint("[OLED] Starting OLED display setup using Adafruit library...");
+    debugPrint("[OLED] Starting OLED");
     
     // Attempt to initialize the display with auto-detection
     if (begin()) {
         // Display initialized successfully
-        debugPrintf("[OLED] Display ready at address 0x%02X", getAddress());
+        debugPrintf("[OLED] Display at 0x%02X", getAddress());
         
         // Show simple test screen
         clear();
@@ -349,10 +349,10 @@ void OLED::setupOLED() {
         print("Ready!");
         
         display();  // Update physical display
-        debugPrint("[OLED] Test screen displayed");
+        debugPrint("[OLED] Test screen");
         
         // Brief delay to show test message
-        delay(3000);
+        delay(1000);
         
         // Show welcome screen
         clear();
@@ -368,13 +368,13 @@ void OLED::setupOLED() {
         showStatus("Starting...");
         display();
         
-        debugPrint("[OLED] Welcome screen displayed");
+        debugPrint("[OLED] init OK");
         delay(2000);
         
     } else {
         // Display initialization failed
-        debugPrint("[OLED] ERROR: Display initialization failed");
-        debugPrint("[OLED] Check connections and power");
+        debugPrint("[OLED] ERROR: Init failed");
+        debugPrint("[OLED] Check wiring");
     }
 }
 

@@ -4,6 +4,10 @@
 #include "WebServer.h"
 #include "Utils.h"
 
+// Calibration timeout in milliseconds
+const unsigned long calibrationTimeout = 2000;
+
+
 //================================
 // FADER INITIALIZATION
 //================================
@@ -40,9 +44,9 @@ void initializeFaders() {
     faders[i].lastSentOscValue = -1;
     
     // Initialize color
-    faders[i].red = 0;
-    faders[i].green = 60;
-    faders[i].blue = 0;
+    faders[i].red = baseBrightness;
+    faders[i].green = baseBrightness;
+    faders[i].blue = baseBrightness;
     faders[i].colorUpdated = true;
 
     // Initialize touch timing values
@@ -62,6 +66,9 @@ void initializeFaders() {
 
 void configureFaderPins() {
   // Configure pins for each fader
+  
+  analogReadAveraging(16);  // Sets the ADC to always average 16 samples
+
   for (int i = 0; i < NUM_FADERS; i++) {
     Fader& f = faders[i];
     pinMode(f.pwmPin, OUTPUT);
@@ -257,7 +264,7 @@ void calibrateFaders() {
     
     while (plateau < PLATEAU_COUNT) {
       // Check for timeout (10 seconds)
-      if ((millis() - startTime) > 10000) {
+      if ((millis() - startTime) > calibrationTimeout) {
         debugPrintf("ERROR: Fader %d MAX calibration timed out! Using default value of 1023.\n", i);
         f.maxVal = 1023;  // Use default max value
         calibrationSuccess = false;
@@ -295,7 +302,7 @@ void calibrateFaders() {
     
     while (plateau < PLATEAU_COUNT) {
       // Check for timeout (10 seconds)
-      if ((millis() - startTime) > 10000) {
+      if ((millis() - startTime) > calibrationTimeout) {
         debugPrintf("ERROR: Fader %d MIN calibration timed out! Using default value of 0.\n", i);
         f.minVal = 0;  // Use default min value
         minCalibrationSuccess = false;

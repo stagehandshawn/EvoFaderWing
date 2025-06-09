@@ -18,6 +18,8 @@ EthernetUDP udp;
 void setupNetwork() {
   debugPrint("Setting up network...");
   
+  delay(100); //make sure we see network debug message before looking for dhcp so we know we are booting up
+
   // Start Ethernet with configured settings
   if (netConfig.useDHCP) {
     debugPrint("Using DHCP...");
@@ -264,4 +266,50 @@ void printOSC(Print &out, const uint8_t *b, int len) {
     }
   }
   out.println();
+}
+
+
+
+
+// new functions that have not been tested yet
+
+void sendOscMessage(const char* address, const char* typeTag, const void* value) {
+  uint8_t buffer[128];
+  int len = 0;
+
+  // Write address
+  int addrLen = strlen(address);
+  memcpy(buffer + len, address, addrLen);
+  len += addrLen;
+  buffer[len++] = '\0';
+  while (len % 4 != 0) buffer[len++] = '\0';
+
+  // Write type tag
+  int tagLen = strlen(typeTag);
+  memcpy(buffer + len, typeTag, tagLen);
+  len += tagLen;
+  buffer[len++] = '\0';
+  while (len % 4 != 0) buffer[len++] = '\0';
+
+  // Add argument(s)
+  if (strcmp(typeTag, ",i") == 0) {
+    int v = *(int*)value;
+    uint32_t netOrder = htonl(v);
+    memcpy(buffer + len, &netOrder, 4);
+    len += 4;
+  } else if (strcmp(typeTag, ",s") == 0) {
+    const char* str = (const char*)value;
+    int strLen = strlen(str);
+    memcpy(buffer + len, str, strLen);
+    len += strLen;
+    buffer[len++] = '\0';
+    while (len % 4 != 0) buffer[len++] = '\0';
+  } else {
+    debugPrint("Unsupported OSC typeTag.");
+    return;
+  }
+
+  udp.beginPacket(netConfig.sendToIP, netConfig.sendPort);
+  udp.write(buffer, len);
+  udp.endPacket();
 }

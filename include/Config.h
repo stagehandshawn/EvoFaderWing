@@ -41,12 +41,12 @@
 #define OSC_RATE_LIMIT     20    // Minimum ms between OSC messages
 
 // NeoPixel configuration
-#define NEOPIXEL_PIN 40
-#define PIXELS_PER_FADER 10
+#define NEOPIXEL_PIN 12
+#define PIXELS_PER_FADER 24
 #define NUM_PIXELS (NUM_FADERS * PIXELS_PER_FADER)
 
 // Touch sensor configuration
-#define IRQ_PIN 2
+#define IRQ_PIN 13
 #define MPR121_ADDRESS 0x5A
 
 //================================

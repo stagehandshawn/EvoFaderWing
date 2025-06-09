@@ -10,7 +10,7 @@
     {
       "label": "Teensy Auto Upload",
       "type": "shell",
-      "command": "/Users/shawn/.platformio/penv/bin/platformio run && python3 teensy_auto_upload.py",
+      "command": "python3 teensy_auto_upload.py",
       "problemMatcher": []
     }
   ]

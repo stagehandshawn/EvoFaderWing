@@ -103,7 +103,7 @@ bool setupTouch() {
 //================================
 
 bool processTouchChanges() {
-  static uint16_t lastRawTouchBits = 0;
+  //static uint16_t lastRawTouchBits = 0;
   uint16_t currentTouches = mpr121.touched();
   unsigned long now = millis();
   bool stateUpdated = false;

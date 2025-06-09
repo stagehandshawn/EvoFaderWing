@@ -66,7 +66,7 @@ void setup() {
   Serial.begin(SERIAL_BAUD);
   while (!Serial && millis() < 4000) {}
   
-  debugPrint("Teensy 4.1 Motorized Fader Controller initializing...");
+  debugPrint("GMA3 FaderWing init...");
 
   // Initialize faders
   initializeFaders();
@@ -83,11 +83,13 @@ void setup() {
   //Setup I2C Slaves so we can also check for network reset
   //setupI2cPolling();
   setupI2cPollingSimple();
-   
+  
+  // Setup OLED before network to watch for no dhcp server and know were booting
+  display.setupOLED();
+
   // Set up network connection
   setupNetwork();
 
-  display.setupOLED();
 
   display.clear();
   // Show IP address
@@ -134,7 +136,8 @@ void loop() {
     debugPrint(getLastTouchError().c_str());
     clearTouchError();
   }
-
+  
+  // If in debug mode will check for a serial request to reboot into bootloader mode for auto upload without pressing button
   if (debugMode) {
       checkSerialForReboot();
   }
