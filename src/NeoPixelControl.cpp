@@ -5,7 +5,7 @@
 #include <cmath>
 
 //NeoPixel Debug print
-bool neoPixelDebug = true;
+bool neoPixelDebug = false;
 
 //================================
 // GLOBAL NEOPIXEL OBJECT
@@ -187,9 +187,11 @@ void updateBrightnessOnFaderTouchChange() {
       f.brightnessStartTime = millis();
       f.targetBrightness = currentTouch ? touchedBrightness : baseBrightness;
 
-      debugPrintf("Fader %d → Touch %s → Brightness target = %d", i,
+      if (neoPixelDebug){
+          debugPrintf("Fader %d → Touch %s → Brightness target = %d", i,
                   currentTouch ? "TOUCHED" : "released",
                   f.targetBrightness);
+      }
 
       previousTouch[i] = currentTouch;
     }

@@ -85,7 +85,7 @@ void setup() {
 
   //Setup I2C Slaves so we can also check for network reset
   //setupI2cPolling();
-  setupI2cPollingSimple();
+  setupI2cPolling();
   
   // Setup OLED before network to watch for no dhcp server and know were booting
   display.setupOLED();
@@ -108,7 +108,7 @@ void setup() {
   setupNeoPixels();
 
   // Check if we need to run calibration
-  // checkCalibration();  // COMMENTED OUT FOR TESTING - REENABLE WHEN NEEDED
+  checkCalibration();  
   
   //Network reset check
   resetCheckStartTime = millis();
@@ -123,15 +123,15 @@ void loop() {
     debugPrint("[RESET] Reset check window expired.");
   }
   
-  // Check for web requests
-  pollWebServer();
+  // Process faders
+  handleFaders();
+
   
   // Process OSC messages
   handleOscMessage();
 
   // Handle I2C Polling for encoders keypresses and encoder key press
-    //handleI2c();
-    handleI2cSimple();
+    handleI2c();
 
   // Process touch changes - this function already checks the flag internally
   if (processTouchChanges()) {
@@ -139,11 +139,9 @@ void loop() {
     printFaderTouchStates();
   }
 
-  // Process faders
-  handleFaders();
+  // Check for web requests
+  pollWebServer();
   
-  // Update NeoPixels
-  updateNeoPixels();
 
   // Handle touch sensor errors
   if (hasTouchError()) {
@@ -151,6 +149,10 @@ void loop() {
     clearTouchError();
   }
   
+    // Update NeoPixels
+  updateNeoPixels();
+
+
   // If in debug mode will check for a serial request to reboot into bootloader mode for auto upload without pressing button
   if (debugMode) {
       checkSerialForReboot();

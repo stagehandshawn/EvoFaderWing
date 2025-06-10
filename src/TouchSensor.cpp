@@ -334,6 +334,9 @@ void clearTouchError() {
 //================================
 
 void printFaderTouchStates() {
+  if (!touchDebug){
+    return;
+  }
   debugPrint("Fader Touch States:");
   for (int i = 0; i < NUM_FADERS; i++) {
     if (faders[i].touched) {
