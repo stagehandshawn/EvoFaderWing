@@ -20,13 +20,25 @@ if not os.path.exists(teensy_cli):
     print("[RESET] Make sure Teensy platform is installed in PlatformIO")
     sys.exit(1)
 
-# ------------------ FIND PORT ------------------
+# # ------------------ FIND PORT ------------------
+# # Try both possible port patterns
+# ports = glob.glob("/dev/cu.usbmodem*") + glob.glob("/dev/ttyACM*")
+# if not ports:
+#     print("[RESET] No Teensy serial port found!")
+#     print("[RESET] Available ports:")
+#     all_ports = glob.glob("/dev/cu.*") + glob.glob("/dev/tty.*")
+#     for port in all_ports:
+#         print(f"[RESET]   {port}")
+#     print("[RESET] Make sure Teensy is connected and running your code")
+#     sys.exit(1)
+
+# ------------------ FIND PORT INCLUDING WINDOWS COM PORTS ------------------
 # Try both possible port patterns
-ports = glob.glob("/dev/cu.usbmodem*") + glob.glob("/dev/ttyACM*")
+ports = glob.glob("/dev/cu.usbmodem*") + glob.glob("/dev/ttyACM*") + glob.glob("COM*")
 if not ports:
     print("[RESET] No Teensy serial port found!")
     print("[RESET] Available ports:")
-    all_ports = glob.glob("/dev/cu.*") + glob.glob("/dev/tty.*")
+    all_ports = glob.glob("/dev/cu.*") + glob.glob("/dev/tty.*") + glob.glob("COM*")
     for port in all_ports:
         print(f"[RESET]   {port}")
     print("[RESET] Make sure Teensy is connected and running your code")

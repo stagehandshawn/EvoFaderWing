@@ -189,6 +189,9 @@ extern Fader faders[NUM_FADERS];
 extern NetworkConfig netConfig;
 extern FaderConfig Fconfig;
 
+// Page tracking
+extern int currentOSCPage;
+
 // Touch sensor globals
 extern int autoCalibrationMode;
 extern uint8_t touchThreshold;

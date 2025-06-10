@@ -96,3 +96,6 @@ unsigned long resetCheckStartTime = 0;
 // I2C POLLING VARIABLES
 //================================
 const unsigned long pollInterval = 5; // 5ms for I2C polling
+
+// Page Tracking
+int currentOSCPage = 1;  // Default to page 1
