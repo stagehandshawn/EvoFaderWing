@@ -108,8 +108,8 @@ void handleOscMovement(const char *address, int value) {
     // If we received a message for a different page, update current page
     if (pageNum != currentOSCPage) {
       debugPrintf("Page changed from %d to %d (via fader message)\n", currentOSCPage, pageNum);
-      currentOSCPage = pageNum;
     }
+    currentOSCPage = pageNum;
     
     int faderIndex = getFaderIndexFromID(faderID);  
 
@@ -147,8 +147,8 @@ void handlePageUpdate(const char *address, int value) {
   if (strstr(address, "/updatePage/current") != NULL) {
     if (value != currentOSCPage) {
       debugPrintf("Page changed from %d to %d (via updatePage command)\n", currentOSCPage, value);
-      currentOSCPage = value;
     }
+    currentOSCPage = value;
   }
 }
 
@@ -167,6 +167,9 @@ void sendOscUpdate(Fader& f, int value, bool force) {
     
     char oscAddress[32];
     snprintf(oscAddress, sizeof(oscAddress), "/Page%d/Fader%d", currentOSCPage, f.oscID);
+    
+
+    debugPrintf("Sending OSC update for Fader %d on Page %d → value: %d\n", f.oscID, currentOSCPage, value);
     
     // Create OSC message - This is a simplified placeholder
     // OSC message format: [address]\0,[tags]\0,data...

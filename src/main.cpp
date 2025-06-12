@@ -123,6 +123,7 @@ void loop() {
     debugPrint("[RESET] Reset check window expired.");
   }
   
+  handleOscMessage();
   // Process faders
   handleFadersSimple();
 
@@ -133,31 +134,32 @@ void loop() {
   // Handle I2C Polling for encoders keypresses and encoder key press
     handleI2c();
 
+    handleOscMessage();
   // Process touch changes - this function already checks the flag internally
   if (processTouchChanges()) {
     updateBrightnessOnFaderTouchChange();
     printFaderTouchStates();
   }
-
+handleOscMessage();
   // Check for web requests
   pollWebServer();
   
-
+handleOscMessage();
   // Handle touch sensor errors
   if (hasTouchError()) {
     debugPrint(getLastTouchError().c_str());
     clearTouchError();
   }
-  
+  handleOscMessage();
     // Update NeoPixels
   updateNeoPixels();
-
+handleOscMessage();
 
   // If in debug mode will check for a serial request to reboot into bootloader mode for auto upload without pressing button
   if (debugMode) {
       checkSerialForReboot();
   }
-
+handleOscMessage();
   yield(); // Let the Teensy do background tasks
 }
 
