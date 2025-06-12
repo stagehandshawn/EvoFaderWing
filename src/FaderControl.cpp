@@ -1,3 +1,4 @@
+// FaderControl.cpp
 #include "FaderControl.h"
 #include "NetworkOSC.h"
 #include "TouchSensor.h"
@@ -126,7 +127,7 @@ void moveAllFadersToSetpoints() {
       Fader& f = faders[i];
       
       // Read current position as OSC value
-      int currentOscValue = readFaderOSC(f);
+      int currentOscValue = readFadertoOSC(f);
       
       // Setpoint is already in OSC units (0-100)
       int targetOscValue = (int)f.setpoint;
@@ -137,7 +138,6 @@ void moveAllFadersToSetpoints() {
       // Check if we need to move this fader (using a smaller tolerance for OSC units) IF NOT TOUCHING IT
       if (abs(difference) > Fconfig.targetTolerance && !f.touched) {
         allFadersAtTarget = false; // At least one fader is not at target
-        f.state = FADER_MOVING;
         
         // Determine direction and move
         // if (difference > 0) {
@@ -169,7 +169,6 @@ void moveAllFadersToSetpoints() {
         } else {
           // Fader is at target, stop motor
           driveMotorWithPWM(f, 0, 0);
-          f.state = FADER_IDLE;
         }
 
       // } else {
@@ -190,7 +189,6 @@ void moveAllFadersToSetpoints() {
       // Stop all motors if we've been trying for too long
       for (int i = 0; i < NUM_FADERS; i++) {
         driveMotor(faders[i], 0);
-        faders[i].state = FADER_ERROR;
       }
       if (debugMode) {
         debugPrintf("Fader movement timeout - stopping all motors\n");
@@ -220,7 +218,7 @@ void setFaderSetpoint(int faderIndex, int oscValue) {
 
 ///////////////////////////
 
-void handleFadersSimple() {
+void handleFaders() {
   for (int i = 0; i < NUM_FADERS; i++) {
     Fader& f = faders[i];
 
@@ -229,7 +227,7 @@ void handleFadersSimple() {
     }
 
     // Read current position and get OSC value in one call
-    int currentOscValue = readFaderOSC(f);
+    int currentOscValue = readFadertoOSC(f);
     
     if (abs(currentOscValue - f.lastReportedValue) >= Fconfig.sendTolerance) {
       f.lastReportedValue = currentOscValue;
@@ -251,7 +249,7 @@ void handleFadersSimple() {
 
 
 // Read fader analog pin and return OSC value (0-100) using fader's calibrated range, with clamping at both ends
-int readFaderOSC(Fader& f) {
+int readFadertoOSC(Fader& f) {
   int analogValue = analogRead(f.analogPin);
 
   // Clamp near-bottom analog values to force OSC = 0
@@ -273,14 +271,3 @@ int readFaderOSC(Fader& f) {
   int oscValue = map(analogValue, f.minVal, f.maxVal, 0, 100);
   return constrain(oscValue, 0, 100);
 }
-
-//ORIGINAL BELOW NO CLAMPING
-
-// // Read fader analog pin and return OSC value (0-100) using fader's calibrated range
-// int readFaderOSC(Fader& f) {
-//   int analogValue = analogRead(f.analogPin);
-//   int oscValue = map(analogValue, f.minVal, f.maxVal, 0, 100);
-//   //debugPrintf("Fader %d analog read: %d", f.oscID, analogValue);
-//   //debugPrintf("Fader %d osc value: %d", f.oscID, oscValue);
-//   return constrain(oscValue, 0, 100);
-// }

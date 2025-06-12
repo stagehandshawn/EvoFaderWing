@@ -1,3 +1,5 @@
+// EEPROMStorage.cpp
+
 #include "EEPROMStorage.h"
 #include "TouchSensor.h"
 #include "Utils.h"
@@ -193,20 +195,12 @@ void saveAllConfig() {
 
 void resetToDefaults() {
   // Reset config to defaults using the macro values
-  Fconfig.pidKp = PID_KP;
-  Fconfig.pidKi = PID_KI;
-  Fconfig.pidKd = PID_KD;
   Fconfig.motorDeadzone = MOTOR_DEADZONE;
   Fconfig.defaultPwm = DEFAULT_PWM;
   Fconfig.calibratePwm = CALIB_PWM;
   Fconfig.targetTolerance = TARGET_TOLERANCE;
   Fconfig.sendTolerance = SEND_TOLERANCE;
   
-  // Apply reset PID settings to controllers
-  for (int i = 0; i < NUM_FADERS; i++) {
-    faders[i].pidController->SetTunings(Fconfig.pidKp, Fconfig.pidKi, Fconfig.pidKd);
-    faders[i].pidController->SetOutputLimits(-Fconfig.defaultPwm, Fconfig.defaultPwm);
-  }
   
   // Reset touch settings
   autoCalibrationMode = 2; // Default value (conservative)
@@ -273,9 +267,6 @@ void dumpEepromConfig() {
     FaderConfig storedConfig;
     EEPROM.get(EEPROM_CONFIG_DATA_ADDR, storedConfig);
     
-    debugPrintf("PID P Gain: %.3f\n", storedConfig.pidKp);
-    debugPrintf("PID I Gain: %.3f\n", storedConfig.pidKi);
-    debugPrintf("PID D Gain: %.3f\n", storedConfig.pidKd);
     debugPrintf("Motor Deadzone: %d\n", storedConfig.motorDeadzone);
     debugPrintf("Default PWM: %d\n", storedConfig.defaultPwm);
     debugPrintf("Calibration PWM: %d\n", storedConfig.calibratePwm);
@@ -334,25 +325,7 @@ void dumpEepromConfig() {
                EEPROM.read(EEPROM_TOUCH_SIGNATURE_ADDR), TOUCHCFG_EEPROM_SIGNATURE);
   }
   
-  // Compare current settings with stored settings
-  debugPrint("\n--- Current vs Stored Settings ---");
-  debugPrint("Fader Configuration:");
-  if (EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR) == FADERCFG_EEPROM_SIGNATURE) {
-    FaderConfig storedConfig;
-    EEPROM.get(EEPROM_CONFIG_DATA_ADDR, storedConfig);
-    
-    debugPrintf("PID P Gain: Current=%.3f, Stored=%.3f %s\n", 
-               Fconfig.pidKp, storedConfig.pidKp, 
-               (abs(Fconfig.pidKp - storedConfig.pidKp) < 0.001) ? "" : "!!!");
-    
-    debugPrintf("PID I Gain: Current=%.3f, Stored=%.3f %s\n", 
-               Fconfig.pidKi, storedConfig.pidKi,
-               (abs(Fconfig.pidKi - storedConfig.pidKi) < 0.001) ? "" : "!!!");
-    
-    debugPrintf("PID D Gain: Current=%.3f, Stored=%.3f %s\n", 
-               Fconfig.pidKd, storedConfig.pidKd,
-               (abs(Fconfig.pidKd - storedConfig.pidKd) < 0.001) ? "" : "!!!");
-  }
+
   
   debugPrint("\n===== END OF EEPROM DUMP =====\n");
 }

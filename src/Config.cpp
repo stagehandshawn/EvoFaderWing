@@ -1,3 +1,4 @@
+// Config.cpp
 #include "Config.h"
 
 //================================
@@ -31,16 +32,14 @@ const uint16_t OSC_IDS[NUM_FADERS] = {201, 202, 203, 204, 205, 206, 207, 208, 20
 //================================
 // Default PID and motor tuning settings shared across all faders.
 FaderConfig Fconfig = {
-  .pidKp = PID_KP,
-  .pidKi = PID_KI,
-  .pidKd = PID_KD,
   .motorDeadzone = MOTOR_DEADZONE,
   .defaultPwm = DEFAULT_PWM,
   .calibratePwm = CALIB_PWM,
   .targetTolerance = TARGET_TOLERANCE,
   .sendTolerance = SEND_TOLERANCE,
-  .invertMotorDirection = false,
-  .invertFaderRange = false,
+  .baseBrightness = 5,
+  .touchedBrightness = 40,
+  .fadeTime = 1000
 };
 
 //================================
@@ -58,13 +57,7 @@ NetworkConfig netConfig = {
   true                             // useDHCP (fallback to static if false)
 };
 
-//================================
-// NEOPIXEL BRIGHTNESS SETTINGS
-//================================
-// Used to control LED brightness on idle vs. touch, and animate fades.
-uint8_t baseBrightness = 5;
-uint8_t touchedBrightness = 40;
-unsigned long fadeTime = 1000;  // Duration in ms for brightness fade animation
+
 
 //================================
 // DEBUG SETTINGS

@@ -1,6 +1,6 @@
--- pam-OSC. It allows to control GrandMA3 with Midi Devices over Open Stage Control and allows for Feedback from MA.
--- Copyright (C) 2024  xxpasixx
--- Modified to only watch faders 201-210 for fader values, color values, and page updates
+-- grandma_lua_lua_script_50ms.lua
+
+
 -- Sends ALL data as ONE OSC message: page + fader values (0-100) + color values
 -- 
 -- CONFIGURATION:

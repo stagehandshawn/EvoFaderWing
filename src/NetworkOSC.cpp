@@ -1,8 +1,10 @@
+// NetworkOSC.cpp
+
 #include "NetworkOSC.h"
 #include "Utils.h"
 #include "FaderControl.h"
 
-void moveFaderToSetpoint(Fader& f);  // Forward declaration
+
 
 //================================
 // GLOBAL NETWORK OBJECTS
@@ -119,25 +121,6 @@ void handleOscMovement(const char *address, int value) {
             debugPrintf("Fader %d new setpoint %d (via fader message)\n", faderID, value);
       setFaderSetpoint(faderIndex, value); // oscValue is 0-100
       moveAllFadersToSetpoints(); // This will move all faders as needed
-
-    // Find and update the fader
-    // for (int i = 0; i < NUM_FADERS; i++) {
-    //   Fader& f = faders[i];
-    //   if (f.oscID == faderID) {
-    //     // Map the incoming 0-100 value to the fader's analog range
-    //     int newSetpoint = map(value, 0, 100, f.minVal, f.maxVal);
-
-    //     if (abs(newSetpoint - f.setpoint) > Fconfig.targetTolerance) {
-    //       f.setpoint = newSetpoint;
-    //       debugPrintf("OSC IN → Page %d Fader %d (%s) = %d, setpoint = %.1f\n", 
-    //                  pageNum, i, address, value, f.setpoint);
-    //       moveFaderToSetpoint(f);
-    //     }
-    //     break;
-    //   }
-    // }
-
-
   }
 }
 
@@ -368,7 +351,7 @@ void handleBundledFaderUpdate(LiteOSCParser& parser) {
       if (!faders[faderIndex].touched) {
         // Check if the value actually changed before updating
         //int currentSetpoint = faders[faderIndex].setpoint;
-        int currentOscvalue = readFaderOSC(faders[faderIndex]);
+        int currentOscvalue = readFadertoOSC(faders[faderIndex]);
         
         // Convert OSC value (0-100) to fader range if needed
         // (You may need to adjust this based on how your setFaderSetpoint works)

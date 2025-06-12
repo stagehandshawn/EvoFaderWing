@@ -1,4 +1,4 @@
-//Fader init
+// InitFaders.cpp
 
 #include "FaderControl.h"
 #include "Utils.h"
@@ -24,8 +24,6 @@ void initializeFaders() {
     faders[i].current = 0;
     faders[i].motorOutput = 0;
     faders[i].lastMotorOutput = 0;
-    //faders[i].pidController = nullptr;  //remove for testing and to make it more simple already getting average readings
-    faders[i].state = FADER_IDLE;
     faders[i].lastReportedValue = -1;  //remove for testing and to make it more simple already getting average readings
     faders[i].lastMoveTime = 0;
     faders[i].lastOscSendTime = 0;
@@ -36,9 +34,9 @@ void initializeFaders() {
     faders[i].lastSentOscValue = -1;
     
     // Initialize color
-    faders[i].red = baseBrightness;
-    faders[i].green = baseBrightness;
-    faders[i].blue = baseBrightness;
+    faders[i].red = Fconfig.baseBrightness;
+    faders[i].green = Fconfig.baseBrightness;
+    faders[i].blue = Fconfig.baseBrightness;
     faders[i].colorUpdated = true;
 
     // Initialize touch timing values
@@ -48,8 +46,8 @@ void initializeFaders() {
     faders[i].releaseTime = 0;
 
     // Initialize brightness values
-    faders[i].currentBrightness = baseBrightness;
-    faders[i].targetBrightness = baseBrightness;
+    faders[i].currentBrightness = Fconfig.baseBrightness;
+    faders[i].targetBrightness = Fconfig.baseBrightness;
     faders[i].brightnessStartTime = 0;
     faders[i].lastReportedBrightness = 0;
   
@@ -75,7 +73,6 @@ void configureFaderPins() {
     f.setpoint = 50;  // NEW - OSC value set faders to center for testing later will be 0 value
     
     // Initialize state
-    f.state = FADER_IDLE;
     f.touched = false;
   }
 
@@ -91,9 +88,6 @@ void calibrateFaders() {
   debugPrintf("Calibration started at PWM: %d\n", Fconfig.calibratePwm);
   for (int i = 0; i < NUM_FADERS; i++) {
     Fader& f = faders[i];
-    
-    // Set state to calibrating
-    f.state = FADER_CALIBRATING;
     
     // ==================== MAX VALUE CALIBRATION ====================
     debugPrintf("Fader %d → Calibrating Max...\n", i);
@@ -187,8 +181,6 @@ void calibrateFaders() {
       f.maxVal = 1000;
     }
     
-    // Reset fader state to idle
-    f.state = FADER_IDLE;
     
     // Reset setpoint
     f.setpoint = analogRead(f.analogPin);

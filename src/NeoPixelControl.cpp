@@ -1,3 +1,4 @@
+// NeoPixelControl.cpp
 
 #include "NeoPixelControl.h"
 #include "Utils.h"
@@ -142,10 +143,10 @@ void updateNeoPixels() {
     // Calculate fade progress for brightness transitions
     if (f.currentBrightness != f.targetBrightness) {
       unsigned long elapsed = now - f.brightnessStartTime;
-      if (elapsed >= fadeTime) {
+      if (elapsed >= Fconfig.fadeTime) {
         f.currentBrightness = f.targetBrightness;
       } else {
-        float progress = elapsed / (float)fadeTime;
+        float progress = elapsed / (float)Fconfig.fadeTime;
         int start = f.currentBrightness;
         int delta = (int)f.targetBrightness - start;
         f.currentBrightness = start + (int)(delta * progress);
@@ -185,7 +186,7 @@ void updateBrightnessOnFaderTouchChange() {
 
     if (currentTouch != previousTouch[i]) {
       f.brightnessStartTime = millis();
-      f.targetBrightness = currentTouch ? touchedBrightness : baseBrightness;
+      f.targetBrightness = currentTouch ? Fconfig.touchedBrightness : Fconfig.baseBrightness;
 
       if (neoPixelDebug){
           debugPrintf("Fader %d → Touch %s → Brightness target = %d", i,

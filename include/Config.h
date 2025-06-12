@@ -1,3 +1,4 @@
+// Config.h
 #ifndef CONFIG_H
 #define CONFIG_H
 
@@ -18,12 +19,6 @@
 #define CALIB_PWM       60      // Reduced motor speed during auto-calibration phase
 #define MOTOR_DEADZONE  30       // Minimum PWM to overcome motor inertia
 
-// PID controller settings
-#define PID_KP          0.5      // PID proportional gain
-#define PID_KI          0.05     // PID integral gain
-#define PID_KD          0.1      // PID derivative gain
-#define PID_SAMPLE_TIME 25       // How often (in milliseconds) PID is evaluated
-
 // Fader position tolerances
 #define TARGET_TOLERANCE 3      // OSC VALUE How close (in analog units) fader must be to setpoint to consider "done"
 #define SEND_TOLERANCE   1       // Also osc value now
@@ -32,9 +27,6 @@
 #define PLATEAU_THRESH   2       // Threshold (analog delta) to consider that the fader has stopped moving
 #define PLATEAU_COUNT    10      // How many stable readings in a row needed to "lock in" max or min during calibration
 
-// Filtering and smoothing
-#define FILTER_SIZE     5        // Size of moving average filter for smoothing readings
-#define MAX_VELOCITY_CHANGE 5.0  // Maximum change in PWM per update for smooth acceleration
 
 // OSC settings
 #define OSC_VALUE_THRESHOLD 2    // Minimum value change to send OSC update
@@ -69,19 +61,7 @@ extern const uint16_t OSC_IDS[NUM_FADERS];
 //================================
 // BRIGHTNESS SETTINGS
 //================================
-extern uint8_t baseBrightness;         // Default idle brightness
-extern uint8_t touchedBrightness;      // Brightness when fader is touched
-extern unsigned long fadeTime;         // Fade duration in milliseconds
 
-//================================
-// STATE MACHINE DEFINITIONS
-//================================
-enum FaderState {
-  FADER_IDLE,         // Fader is not moving and at target position
-  FADER_MOVING,       // Fader is actively moving toward target
-  FADER_CALIBRATING,  // Fader is in calibration mode
-  FADER_ERROR         // Fader has encountered an error
-};
 
 //================================
 // NETWORK CONFIGURATION
@@ -107,16 +87,14 @@ struct NetworkConfig {
 
 // Configuration structure that can be saved to EEPROM
 struct FaderConfig {
-  float pidKp;
-  float pidKi;
-  float pidKd;
   uint8_t motorDeadzone;
   uint8_t defaultPwm;
   uint8_t calibratePwm;
   uint8_t targetTolerance;
   uint8_t sendTolerance;
-  bool invertMotorDirection;
-  bool invertFaderRange;
+  uint8_t baseBrightness;         // Default idle brightness
+  uint8_t touchedBrightness;      // Brightness when fader is touched
+  unsigned long fadeTime;         // Fade duration in milliseconds
 };
 
 // Touch sensor configuration
@@ -146,12 +124,6 @@ struct Fader {
   double lastMotorOutput;   // Last motor output for velocity limiting
 
 
-  float pidKp;
-  float pidKi;
-  float pidKd;
-
-  PID* pidController;       // Pointer to PID controller
-  FaderState state;         // Current state in state machine
   int lastReportedValue;    // Last value printed or sent
   unsigned long lastMoveTime; // Time of last movement
   unsigned long lastOscSendTime; // Time of last OSC message

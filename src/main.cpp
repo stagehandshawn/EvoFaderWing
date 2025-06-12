@@ -1,3 +1,4 @@
+// Main.cpp
 /*
  * Enhanced Teensy 4.1 Motorized Fader Controller
  * PlatformIO Version - Modular Architecture
@@ -129,8 +130,8 @@ void loop() {
   handleOscMessage();
 
 
-  // Process faders
-  handleFadersSimple();
+  // Check for manual fader movement
+  handleFaders();
 
 
 

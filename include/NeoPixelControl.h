@@ -1,3 +1,4 @@
+// NeoPixelControl.h
 #ifndef NEOPIXEL_CONTROL_H
 #define NEOPIXEL_CONTROL_H
 

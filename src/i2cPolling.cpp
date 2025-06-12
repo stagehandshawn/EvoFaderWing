@@ -1,3 +1,5 @@
+// i2cPolling.cpp
+
 // === TEENSY 4.1 I2C POLLING MASTER ===
 // Polls 5 ATmega slaves for keyboard and encoder data ONLY
 // No interrupt pins needed - pure polling approach

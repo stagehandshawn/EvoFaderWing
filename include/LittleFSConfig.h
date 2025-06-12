@@ -1,3 +1,5 @@
+// LittleFSConfig.h
+//WE ARE NOT CURRENTLY USING THIS
 #pragma once
 #include <Arduino.h>
 #include <LittleFS.h>

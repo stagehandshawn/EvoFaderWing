@@ -1,3 +1,4 @@
+// WebServer.h
 #ifndef WEB_SERVER_H
 #define WEB_SERVER_H
 
@@ -45,6 +46,7 @@ void handleDebugToggle(String requestBody);
 void handleResetDefaults();
 void handleNetworkReset();
 void handleStatsPage();
+void handleFaderSettingsPage();
 
 // Response helpers
 void send404Response();

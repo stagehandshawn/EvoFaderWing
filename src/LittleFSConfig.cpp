@@ -1,3 +1,6 @@
+// LittleFSConfig.cpp
+//We are not using this code yet
+
 #include "LittleFSConfig.h"
 
 static LittleFS_QSPIFlash flashFS;
