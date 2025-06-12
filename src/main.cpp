@@ -156,9 +156,9 @@ handleOscMessage();
 handleOscMessage();
 
   // If in debug mode will check for a serial request to reboot into bootloader mode for auto upload without pressing button
-  if (debugMode) {
+  
       checkSerialForReboot();
-  }
+
 handleOscMessage();
   yield(); // Let the Teensy do background tasks
 }

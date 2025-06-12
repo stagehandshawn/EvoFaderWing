@@ -49,43 +49,43 @@ void setupNetwork() {
 // OSC MESSAGE HANDLING
 //================================
 
-// Consolidated OSC message handler
-void handleOscMessage() {
-  int size = udp.parsePacket();
-  if (size <= 0) return;
+// // Consolidated OSC message handler
+// void handleOscMessage() {
+//   int size = udp.parsePacket();
+//   if (size <= 0) return;
 
-  const uint8_t *data = udp.data();
-  LiteOSCParser parser;
+//   const uint8_t *data = udp.data();
+//   LiteOSCParser parser;
 
-  if (!parser.parse(data, size)) {
-    debugPrint("Invalid OSC message.");
-    return;
-  }
+//   if (!parser.parse(data, size)) {
+//     debugPrint("Invalid OSC message.");
+//     return;
+//   }
 
-  const char* addr = parser.getAddress();
+//   const char* addr = parser.getAddress();
 
-  // Handle page update messages
-  if (strstr(addr, "/updatePage/current") != NULL) {
-    if (parser.getTag(0) == 'i') {
-      handlePageUpdate(addr, parser.getInt(0));
-    }
-  }
-  // Handle color messages
-  else if (strstr(addr, "/Color") != NULL) {
-    if (parser.getTag(0) == 's') {
-      handleColorOsc(addr, parser.getString(0));
-    }
-  }
-  // Handle fader movement messages
-  else if (strstr(addr, "/Page") != NULL && strstr(addr, "/Fader") != NULL) {
-    if (parser.getTag(0) == 'i') {
-      int value = parser.getInt(0);
+//   // Handle page update messages
+//   if (strstr(addr, "/updatePage/current") != NULL) {
+//     if (parser.getTag(0) == 'i') {
+//       handlePageUpdate(addr, parser.getInt(0));
+//     }
+//   }
+//   // Handle color messages
+//   else if (strstr(addr, "/Color") != NULL) {
+//     if (parser.getTag(0) == 's') {
+//       handleColorOsc(addr, parser.getString(0));
+//     }
+//   }
+//   // Handle fader movement messages
+//   else if (strstr(addr, "/Page") != NULL && strstr(addr, "/Fader") != NULL) {
+//     if (parser.getTag(0) == 'i') {
+//       int value = parser.getInt(0);
       
-      handleOscMovement(addr, value);
+//       handleOscMovement(addr, value);
 
-    }
-  }
-}
+//     }
+//   }
+// }
 
 // Returns the index of the fader with the given OSC ID, or -1 if not found
 int getFaderIndexFromID(int id) {
@@ -373,4 +373,140 @@ void sendOscMessage(const char* address, const char* typeTag, const void* value)
   udp.beginPacket(netConfig.sendToIP, netConfig.sendPort);
   udp.write(buffer, len);
   udp.endPacket();
+}
+
+
+
+
+
+
+// Add this function to your NetworkOSC.cpp file
+
+// Handle bundled fader update messages
+void handleBundledFaderUpdate(LiteOSCParser& parser) {
+  // Expected format: /faderUpdate,iiiiiiiiiiissssssssss,PAGE,F201,F202...F210,C201,C202...C210
+  
+  if (parser.getArgCount() < 21) {
+    debugPrint("Invalid bundled fader message - not enough arguments");
+    return;
+  }
+  
+  // Parse page number (argument 0)
+  if (parser.getTag(0) != 'i') {
+    debugPrint("Invalid bundled fader message - page not integer");
+    return;
+  }
+  
+  int pageNum = parser.getInt(0);
+  
+  // Update current page if it changed
+  if (pageNum != currentOSCPage) {
+    debugPrintf("Page changed from %d to %d (via bundled message)\n", currentOSCPage, pageNum);
+    currentOSCPage = pageNum;
+  }
+  
+  // Track if any setpoints need updating
+  bool needToMoveFaders = false;
+  
+  // Parse fader values (arguments 1-10 for faders 201-210)
+  for (int i = 0; i < 10; i++) {
+    int argIndex = i + 1; // Arguments 1-10
+    int faderOscID = 201 + i; // Fader IDs 201-210
+    
+    if (parser.getTag(argIndex) != 'i') {
+      debugPrintf("Invalid fader value type for fader %d\n", faderOscID);
+      continue;
+    }
+    
+    int oscValue = parser.getInt(argIndex);
+    int faderIndex = getFaderIndexFromID(faderOscID);
+    
+    if (faderIndex >= 0 && faderIndex < NUM_FADERS) {
+      // Only update if fader is not currently being touched (avoid feedback)
+      if (!faders[faderIndex].touched) {
+        // Check if the value actually changed before updating
+        int currentSetpoint = faders[faderIndex].setpoint;
+        
+        // Convert OSC value (0-127) to fader range if needed
+        // (You may need to adjust this based on how your setFaderSetpoint works)
+        if (abs(oscValue - currentSetpoint) > Fconfig.targetTolerance) {
+          debugPrintf("Updating fader %d setpoint: %d -> %d\n", faderOscID, currentSetpoint, oscValue);
+          setFaderSetpoint(faderIndex, oscValue);
+          needToMoveFaders = true;
+        }
+      }
+    } else {
+      debugPrintf("Fader index not found for OSC ID %d\n", faderOscID);
+    }
+  }
+  
+  // Move all faders to their new setpoints if any changed
+  if (needToMoveFaders) {
+    debugPrint("Moving faders to new setpoints");
+    moveAllFadersToSetpoints();
+  }
+  
+  // Parse color values (arguments 11-20 for faders 201-210)
+  for (int i = 0; i < 10; i++) {
+    int argIndex = i + 11; // Arguments 11-20
+    int faderOscID = 201 + i; // Fader IDs 201-210
+    
+    if (parser.getTag(argIndex) != 's') {
+      debugPrintf("Invalid color value type for fader %d\n", faderOscID);
+      continue;
+    }
+    
+    const char* colorString = parser.getString(argIndex);
+    int faderIndex = getFaderIndexFromID(faderOscID);
+    
+    if (faderIndex >= 0 && faderIndex < NUM_FADERS) {
+      // Parse and update color values
+      parseColorValues(colorString, faders[faderIndex]);
+      debugPrintf("Updated color for fader %d: %s\n", faderOscID, colorString);
+    } else {
+      debugPrintf("Fader index not found for color update, OSC ID %d\n", faderOscID);
+    }
+  }
+  
+  debugPrint("Bundled fader update complete");
+}
+
+// Modified handleOscMessage function - replace your existing one
+void handleOscMessage() {
+  int size = udp.parsePacket();
+  if (size <= 0) return;
+
+  const uint8_t *data = udp.data();
+  LiteOSCParser parser;
+
+  if (!parser.parse(data, size)) {
+    debugPrint("Invalid OSC message.");
+    return;
+  }
+
+  const char* addr = parser.getAddress();
+
+  // Handle bundled fader update messages (NEW)
+  if (strstr(addr, "/faderUpdate") != NULL) {
+    handleBundledFaderUpdate(parser);
+  }
+  // Handle page update messages (EXISTING)
+  else if (strstr(addr, "/updatePage/current") != NULL) {
+    if (parser.getTag(0) == 'i') {
+      handlePageUpdate(addr, parser.getInt(0));
+    }
+  }
+  // Handle color messages (EXISTING)
+  else if (strstr(addr, "/Color") != NULL) {
+    if (parser.getTag(0) == 's') {
+      handleColorOsc(addr, parser.getString(0));
+    }
+  }
+  // Handle individual fader movement messages (EXISTING)
+  else if (strstr(addr, "/Page") != NULL && strstr(addr, "/Fader") != NULL) {
+    if (parser.getTag(0) == 'i') {
+      int value = parser.getInt(0);
+      handleOscMovement(addr, value);
+    }
+  }
 }
