@@ -117,15 +117,15 @@ void handleOscMovement(const char *address, int value) {
 
             // When you receive an OSC message:
             debugPrintf("Fader %d new setpoint %d (via fader message)\n", faderID, value);
-      setFaderSetpoint(faderIndex, value); // oscValue is 0-127
+      setFaderSetpoint(faderIndex, value); // oscValue is 0-100
       moveAllFadersToSetpoints(); // This will move all faders as needed
 
     // Find and update the fader
     // for (int i = 0; i < NUM_FADERS; i++) {
     //   Fader& f = faders[i];
     //   if (f.oscID == faderID) {
-    //     // Map the incoming 0-127 value to the fader's analog range
-    //     int newSetpoint = map(value, 0, 127, f.minVal, f.maxVal);
+    //     // Map the incoming 0-100 value to the fader's analog range
+    //     int newSetpoint = map(value, 0, 100, f.minVal, f.maxVal);
 
     //     if (abs(newSetpoint - f.setpoint) > Fconfig.targetTolerance) {
     //       f.setpoint = newSetpoint;
@@ -157,9 +157,9 @@ void handlePageUpdate(const char *address, int value) {
 void sendOscUpdate(Fader& f, int value, bool force) {
   unsigned long now = millis();
 //Do not send osc of fader is not touched
-  if (!f.touched){
-    return;
-  }
+  // if (!f.touched){
+  //   return;
+  // }
 
   // Only send if value changed significantly or enough time passed or force flag is set
   if (force || (abs(value - f.lastSentOscValue) >= OSC_VALUE_THRESHOLD && 
@@ -233,7 +233,7 @@ void handleColorOsc(const char *address, const char *colorString) {
 // OSC UTILITY FUNCTIONS
 //================================
 
-// Parse color values from a string like "255;127;0;255"
+// Parse color values from a string like "255;157;0;255"
 void parseColorValues(const char *colorString, Fader& f) {
   char buffer[64];
   strncpy(buffer, colorString, 63);
@@ -425,12 +425,13 @@ void handleBundledFaderUpdate(LiteOSCParser& parser) {
       // Only update if fader is not currently being touched (avoid feedback)
       if (!faders[faderIndex].touched) {
         // Check if the value actually changed before updating
-        int currentSetpoint = faders[faderIndex].setpoint;
+        //int currentSetpoint = faders[faderIndex].setpoint;
+        int currentOscvalue = readFaderOSC(faders[faderIndex]);
         
-        // Convert OSC value (0-127) to fader range if needed
+        // Convert OSC value (0-100) to fader range if needed
         // (You may need to adjust this based on how your setFaderSetpoint works)
-        if (abs(oscValue - currentSetpoint) > Fconfig.targetTolerance) {
-          debugPrintf("Updating fader %d setpoint: %d -> %d\n", faderOscID, currentSetpoint, oscValue);
+        if (abs(oscValue - currentOscvalue) > Fconfig.targetTolerance) {
+          debugPrintf("Updating fader %d setpoint: %d -> %d\n", faderOscID, currentOscvalue, oscValue);
           setFaderSetpoint(faderIndex, oscValue);
           needToMoveFaders = true;
         }

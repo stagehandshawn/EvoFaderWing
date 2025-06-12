@@ -76,7 +76,7 @@ public:
         .pidKi = 0.00f,
         .pidKd = 0.00f,
         .motorDeadzone = 10,
-        .defaultPwm = 255,
+        .defaultPwm = 60,
         .calibratePwm = 80,
         .targetTolerance = 2,
         .sendTolerance = 2

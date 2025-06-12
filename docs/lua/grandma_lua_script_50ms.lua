@@ -1,7 +1,7 @@
 -- pam-OSC. It allows to control GrandMA3 with Midi Devices over Open Stage Control and allows for Feedback from MA.
 -- Copyright (C) 2024  xxpasixx
 -- Modified to only watch faders 201-210 for fader values, color values, and page updates
--- Sends ALL data as ONE OSC message: page + fader values + color values
+-- Sends ALL data as ONE OSC message: page + fader values (0-100) + color values
 -- 
 -- CONFIGURATION:
 -- Set autoResendInterval via: SetVar(GlobalVars(), "autoResendInterval", 600) 
@@ -53,7 +53,7 @@ local function main()
     -- Get automatic resend interval (in 20ths of seconds) - default to 300 (15 seconds)
     local autoResendInterval = GetVar(GlobalVars(), "autoResendInterval") or 300
 
-    Printf("start pam OSC main() - watching faders 201-210 (single packet with colors)")
+    Printf("start pam OSC main() - watching faders 201-210 (single packet, 0-100 scale)")
     Printf("autoResendInterval: " .. autoResendInterval .. " (every " .. (autoResendInterval / 20) .. " seconds)")
 
     local destPage = 1
@@ -137,14 +137,14 @@ local function main()
 
         -- Send single OSC message with ALL data if anything changed
         if dataChanged or forceReload then
-            -- Build OSC message: page + 10 fader values + 10 color strings
+            -- Build OSC message: page + 10 fader values (0-100) + 10 color strings
             -- Format: /faderUpdate,iiiiiiiiiiissssssssss,PAGE,F201,F202...F210,C201,C202...C210
             local oscMessage = "/faderUpdate,iiiiiiiiiiissssssssss," .. destPage
             
-            -- Add all fader values (201-210)
+            -- Add all fader values (201-210) as 0-100 integers (no conversion needed)
             for i = 201, 210 do
                 local faderValue = currentFaderValues[i] or 0
-                oscMessage = oscMessage .. "," .. math.floor(faderValue * 1.27)
+                oscMessage = oscMessage .. "," .. math.floor(faderValue)
                 oldValues[i] = faderValue
             end
             
@@ -158,7 +158,7 @@ local function main()
 
             -- Send the single packet containing everything
             Cmd('SendOSC ' .. oscEntry .. ' "' .. oscMessage .. '"')
-            Printf("Sent fader update: Page " .. destPage .. " with all fader and color data")
+            Printf("Sent fader update: Page " .. destPage .. " with all fader (0-100) and color data")
         end
         
         forceReload = false

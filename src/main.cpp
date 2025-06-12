@@ -83,6 +83,8 @@ void setup() {
   // Load configurations from EEPROM
   loadAllConfig();
 
+  moveAllFadersToSetpoints();
+
   //Setup I2C Slaves so we can also check for network reset
   //setupI2cPolling();
   setupI2cPolling();
