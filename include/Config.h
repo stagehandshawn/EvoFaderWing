@@ -25,7 +25,7 @@
 #define PID_SAMPLE_TIME 25       // How often (in milliseconds) PID is evaluated
 
 // Fader position tolerances
-#define TARGET_TOLERANCE 2      // OSC VALUE How close (in analog units) fader must be to setpoint to consider "done"
+#define TARGET_TOLERANCE 3      // OSC VALUE How close (in analog units) fader must be to setpoint to consider "done"
 #define SEND_TOLERANCE   1       // Also osc value now
 
 // Calibration settings

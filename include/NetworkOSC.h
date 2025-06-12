@@ -30,6 +30,8 @@ void handleColorOsc(const char *address, const char *colorString);
 void handleOscMovement(const char *address, int value);
 void handleOscMessage();
 
+void sendOscMessage(const char* address, const char* typeTag, const void* value);
+
 // Page update
 void handlePageUpdate(const char *address, int value);
 

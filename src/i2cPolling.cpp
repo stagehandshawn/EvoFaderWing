@@ -8,6 +8,7 @@
 #include "i2cPolling.h"
 #include "Utils.h"
 #include "EEPROMStorage.h"
+#include "NetworkOSC.h"
 
 // === I2C Slave Addresses ===
 #define I2C_ADDR_KEYBOARD  0x10  // Keyboard matrix ATmega - sends keypress data
@@ -171,11 +172,7 @@ void processEncoderData(uint8_t count, uint8_t address) {
     
     debugPrintf("  Encoder %d: %s%d", encoderNumber, isPositive ? "+" : "-", velocity);
     
-    if (isPositive) {
-          // Positve move
-    } else {
-          // Negative move
-    }
+    sendEncoderOSC(encoderNumber, isPositive, velocity);                                   //ENCODER OSC SEND
   }
 }
 
@@ -217,17 +214,45 @@ void processKeypressData(uint8_t count, uint8_t address) {
       return;  // Skip further processing of this event
     }
 
-
-    // placeholder: Handle key press or release for OSC sending
-    if (state == 1) {
-      // TODO: Send OSC packet for key press event
-    } else {
-      // TODO: Send OSC packet for key release event
-    }
-
+      sendKeyOSC(keyNumber, state);
 
   }
 }
+
+
+void sendEncoderOSC(int encoderNumber, bool isPositive, int velocity) { 
+
+    // Validate encoder number
+  if (encoderNumber > 20) {
+    debugPrintf("[OSC] Invalid encoder number: %d", encoderNumber);
+    return;
+  }
+
+    // Create the OSC address based on encoder number mapping
+  char oscAddress[32];
+  int executorKnobNumber;
+  if (encoderNumber < 11) {
+      // Encoders 0-9 map to ExecutorKnob401-410
+    executorKnobNumber = 400 + encoderNumber;
+  } else {
+      // Encoders 10-19 map to ExecutorKnob301-310
+    executorKnobNumber = 300 + (encoderNumber - 10);
+  }
+
+    // Format the OSC address
+  snprintf(oscAddress, sizeof(oscAddress), "/Encoder%d", executorKnobNumber);
+    // Create signed velocity value
+  int signedVelocity = isPositive ? (int)velocity : -(int)velocity;
+
+    // Send the OSC message
+  sendOscMessage(oscAddress, ",i", &signedVelocity);
+
+    // Debug output
+  debugPrintf("[OSC] Sent: %s %d (encoder %d)", oscAddress, signedVelocity, encoderNumber);
+
+}
+
+
 
 // === PERFORMANCE MEASUREMENT FUNCTION ===
 // Alternative polling function that measures the time taken to poll all slaves
@@ -248,4 +273,36 @@ void measurePollingSpeed() {
   
   // Note: With 5 slaves at 400kHz I2C, total time should be around 2000-3000 microseconds
   // This leaves plenty of time in each 1ms polling cycle for other system operations
+}
+
+
+void sendKeyOSC(uint16_t keyNumber, uint8_t state) {
+  // Validate key number is in expected ranges
+  if (!((keyNumber >= 101 && keyNumber <= 110) ||
+        (keyNumber >= 201 && keyNumber <= 210) ||
+        (keyNumber >= 301 && keyNumber <= 310) ||
+        (keyNumber >= 401 && keyNumber <= 410))) {
+    debugPrintf("[OSC] Invalid key number for OSC: %d", keyNumber);
+    return;
+  }
+  
+  // Validate state
+  if (state > 1) {
+    debugPrintf("[OSC] Invalid key state: %d", state);
+    return;
+  }
+  
+  // Create the OSC address
+  char oscAddress[32];
+  snprintf(oscAddress, sizeof(oscAddress), "/Key%d", keyNumber);
+  
+  // Convert state to int for OSC message
+  int keyState = (int)state;
+  
+  // Send the OSC message
+  sendOscMessage(oscAddress, ",i", &keyState);
+  
+  // Debug output
+  debugPrintf("[OSC] Sent: %s %d (key %d %s)", 
+             oscAddress, keyState, keyNumber, state ? "PRESSED" : "RELEASED");
 }

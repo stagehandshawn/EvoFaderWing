@@ -72,7 +72,7 @@ void configureFaderPins() {
     pinMode(f.dirPin2, OUTPUT);
     
 
-    f.setpoint = 64;  // NEW - OSC value set faders to center for testing later will be 0 value
+    f.setpoint = 50;  // NEW - OSC value set faders to center for testing later will be 0 value
     
     // Initialize state
     f.state = FADER_IDLE;

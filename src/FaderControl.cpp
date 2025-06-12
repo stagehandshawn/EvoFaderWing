@@ -158,6 +158,9 @@ void handleFadersSimple() {
       // Send OSC update (assuming you have this function)
       sendOscUpdate(f, currentOscValue, false);
       
+      f.setpoint = currentOscValue; //i think this needs to happen
+      
+
       if (debugMode) {
         debugPrintf("Fader %d position update: %d\n", f.oscID, currentOscValue);
       }

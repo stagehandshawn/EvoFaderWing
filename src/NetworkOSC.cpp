@@ -273,66 +273,8 @@ bool isBundleStart(const uint8_t *buf, size_t len) {
   return true;
 }
 
-// Print an OSC message for debugging
-void printOSC(Print &out, const uint8_t *b, int len) {
-  LiteOSCParser osc;
 
-  // Check if it's a bundle
-  if (isBundleStart(b, len)) {
-    out.println("#bundle (not parsed)");
-    return;
-  }
-
-  // Parse the message
-  if (!osc.parse(b, len)) {
-    if (osc.isMemoryError()) {
-      out.println("#MemoryError");
-    } else {
-      out.println("#ParseError");
-    }
-    return;
-  }
-
-  // Print address
-  out.printf("%s", osc.getAddress());
-
-  // Print arguments
-  int size = osc.getArgCount();
-  for (int i = 0; i < size; i++) {
-    if (i == 0) {
-      out.print(": ");
-    } else {
-      out.print(", ");
-    }
-    
-    // Print based on type
-    switch (osc.getTag(i)) {
-      case 'i':
-        out.printf("int(%d)", osc.getInt(i));
-        break;
-      case 'f':
-        out.printf("float(%f)", osc.getFloat(i));
-        break;
-      case 's':
-        out.printf("string(\"%s\")", osc.getString(i));
-        break;
-      case 'T':
-        out.print("true");
-        break;
-      case 'F':
-        out.print("false");
-        break;
-      default:
-        out.printf("unknown(%c)", osc.getTag(i));
-    }
-  }
-  out.println();
-}
-
-
-
-
-// new functions that have not been tested yet
+// Put together and send an OSC message 
 
 void sendOscMessage(const char* address, const char* typeTag, const void* value) {
   uint8_t buffer[128];
@@ -460,10 +402,10 @@ void handleBundledFaderUpdate(LiteOSCParser& parser) {
     const char* colorString = parser.getString(argIndex);
     int faderIndex = getFaderIndexFromID(faderOscID);
     
-    if (faderIndex >= 0 && faderIndex < NUM_FADERS) {
+    if (faderIndex >= 0 && faderIndex < NUM_FADERS && !faders[faderIndex].touched) {
       // Parse and update color values
       parseColorValues(colorString, faders[faderIndex]);
-      debugPrintf("Updated color for fader %d: %s\n", faderOscID, colorString);
+      //debugPrintf("Updated color for fader %d: %s\n", faderOscID, colorString);
     } else {
       debugPrintf("Fader index not found for color update, OSC ID %d\n", faderOscID);
     }
@@ -472,7 +414,7 @@ void handleBundledFaderUpdate(LiteOSCParser& parser) {
   debugPrint("Bundled fader update complete");
 }
 
-// Modified handleOscMessage function - replace your existing one
+// Modified handleOscMessage function - replace your existing one  WE WILL BE FIXING AND OR REPLACEING THIS NOW WE Use A BUNDLE
 void handleOscMessage() {
   int size = udp.parsePacket();
   if (size <= 0) return;
@@ -510,4 +452,63 @@ void handleOscMessage() {
       handleOscMovement(addr, value);
     }
   }
+}
+
+
+
+
+// Print an OSC message for debugging
+void printOSC(Print &out, const uint8_t *b, int len) {
+  LiteOSCParser osc;
+
+  // Check if it's a bundle
+  if (isBundleStart(b, len)) {
+    out.println("#bundle (not parsed)");
+    return;
+  }
+
+  // Parse the message
+  if (!osc.parse(b, len)) {
+    if (osc.isMemoryError()) {
+      out.println("#MemoryError");
+    } else {
+      out.println("#ParseError");
+    }
+    return;
+  }
+
+  // Print address
+  out.printf("%s", osc.getAddress());
+
+  // Print arguments
+  int size = osc.getArgCount();
+  for (int i = 0; i < size; i++) {
+    if (i == 0) {
+      out.print(": ");
+    } else {
+      out.print(", ");
+    }
+    
+    // Print based on type
+    switch (osc.getTag(i)) {
+      case 'i':
+        out.printf("int(%d)", osc.getInt(i));
+        break;
+      case 'f':
+        out.printf("float(%f)", osc.getFloat(i));
+        break;
+      case 's':
+        out.printf("string(\"%s\")", osc.getString(i));
+        break;
+      case 'T':
+        out.print("true");
+        break;
+      case 'F':
+        out.print("false");
+        break;
+      default:
+        out.printf("unknown(%c)", osc.getTag(i));
+    }
+  }
+  out.println();
 }
