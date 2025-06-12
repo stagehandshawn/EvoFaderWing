@@ -541,7 +541,7 @@ void handleStatsPage() {
   for (int i = 0; i < NUM_FADERS; i++) {
     Fader& f = faders[i];
     html += "<tr><td>" + String(i) + "</td>";
-    html += "<td>" + String((int)f.smoothedPosition) + "</td>";
+    html += "<td>" + String(analogRead(f.analogPin)) + "</td>";
     html += "<td>" + String(f.minVal) + "</td>";
     html += "<td>" + String(f.maxVal) + "</td>";
     html += "<td>" + String(f.maxVal - f.minVal) + "</td>";

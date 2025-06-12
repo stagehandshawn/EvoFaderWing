@@ -19,7 +19,7 @@ void initializeFaders();
 void configureFaderPins();
 
 // Motor control
-void driveMotor(Fader& f, double pwmOut);
+void driveMotor(Fader& f, int direction);
 
 // Position reading and filtering
 int readSmoothedPosition(Fader& f);
@@ -30,5 +30,14 @@ void updateFaderState(Fader& f);
 // Calibration
 void calibrateFaders();
 
+
+
+
+void handleFadersSimple();
+void moveAllFadersToSetpoints();
+
+void setFaderSetpoint(int faderIndex, int oscValue);
+
+int readFaderOSC(Fader& f);
 
 #endif // FADER_CONTROL_H

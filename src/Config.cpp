@@ -16,16 +16,10 @@ const uint8_t ANALOG_PINS[NUM_FADERS] = {14, 15, 16, 17, 20, 21, 22, 23, 24, 25}
 // PWM output pins used to control fader motor speed via motor drivers.
 const uint8_t PWM_PINS[NUM_FADERS] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 
-// Motor direction control pins — each fader has two pins for H-bridge control.
-// const uint8_t DIR_PINS1[NUM_FADERS] = {26, 28, 30, 32, 34, 36, 0, 1, 12, 13};
-// const uint8_t DIR_PINS2[NUM_FADERS] = {27, 29, 31, 33, 35, 37, 38, 39, 41, 43};
-
 //USE 12 for NEOPIXEL
 //USE 13 for MRP121
-// Motor direction control pins — each fader has two pins for H-bridge control.
-//const uint8_t DIR_PINS1[NUM_FADERS] = {26, 28, 30, 32, 34, 36, 38, 0, 12, 41};
-//const uint8_t DIR_PINS2[NUM_FADERS] = {27, 29, 31, 33, 35, 37, 39, 1, 13, 43};
 
+// Motor direction control pins — each fader has two pins for H-bridge control.
 const uint8_t DIR_PINS1[NUM_FADERS] = {26, 28, 30, 32, 34, 36, 38, 40, 10, 51};
 const uint8_t DIR_PINS2[NUM_FADERS] = {27, 29, 31, 33, 35, 37, 39, 41, 11, 52};
 

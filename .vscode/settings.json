@@ -4,6 +4,16 @@
   "C_Cpp.default.intelliSenseMode": "gcc-x64",
   "C_Cpp.errorSquiggles": "enabled",
   "files.associations": {
-    "*.ino": "cpp"
+    "*.cpp": "cpp",
+    "*.ino": "cpp",
+    "*.tpp": "cpp",
+    "exception": "cpp",
+    "memory_resource": "cpp",
+    "istream": "cpp",
+    "new": "cpp",
+    "ostream": "cpp",
+    "stdexcept": "cpp",
+    "streambuf": "cpp",
+    "*.old": "cpp"
   }
 }

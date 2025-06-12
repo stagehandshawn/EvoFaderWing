@@ -1,5 +1,6 @@
 #include "NetworkOSC.h"
 #include "Utils.h"
+#include "FaderControl.h"
 
 void moveFaderToSetpoint(Fader& f);  // Forward declaration
 
@@ -79,16 +80,28 @@ void handleOscMessage() {
   else if (strstr(addr, "/Page") != NULL && strstr(addr, "/Fader") != NULL) {
     if (parser.getTag(0) == 'i') {
       int value = parser.getInt(0);
+      
       handleOscMovement(addr, value);
+
     }
   }
+}
+
+// Returns the index of the fader with the given OSC ID, or -1 if not found
+int getFaderIndexFromID(int id) {
+  for (int i = 0; i < NUM_FADERS; i++) {
+    if (faders[i].oscID == id) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 // Handles fader movement OSC messages
 void handleOscMovement(const char *address, int value) {
   int pageNum = -1;
   int faderID = -1;
-  
+
   // Extract both page number and fader ID from the OSC address
   if (sscanf(address, "/Page%d/Fader%d", &pageNum, &faderID) == 2) {
     
@@ -98,22 +111,33 @@ void handleOscMovement(const char *address, int value) {
       currentOSCPage = pageNum;
     }
     
-    // Find and update the fader
-    for (int i = 0; i < NUM_FADERS; i++) {
-      Fader& f = faders[i];
-      if (f.oscID == faderID) {
-        // Map the incoming 0-127 value to the fader's analog range
-        int newSetpoint = map(value, 0, 127, f.minVal, f.maxVal);
+    int faderIndex = getFaderIndexFromID(faderID);  
 
-        if (abs(newSetpoint - f.setpoint) > Fconfig.targetTolerance) {
-          f.setpoint = newSetpoint;
-          debugPrintf("OSC IN → Page %d Fader %d (%s) = %d, setpoint = %.1f\n", 
-                     pageNum, i, address, value, f.setpoint);
-          moveFaderToSetpoint(f);
-        }
-        break;
-      }
-    }
+    if (faders[faderIndex].touched) return;   //if touched then don't update using osc or we will get feedback
+
+            // When you receive an OSC message:
+            debugPrintf("Fader %d new setpoint %d (via fader message)\n", faderID, value);
+      setFaderSetpoint(faderIndex, value); // oscValue is 0-127
+      moveAllFadersToSetpoints(); // This will move all faders as needed
+
+    // Find and update the fader
+    // for (int i = 0; i < NUM_FADERS; i++) {
+    //   Fader& f = faders[i];
+    //   if (f.oscID == faderID) {
+    //     // Map the incoming 0-127 value to the fader's analog range
+    //     int newSetpoint = map(value, 0, 127, f.minVal, f.maxVal);
+
+    //     if (abs(newSetpoint - f.setpoint) > Fconfig.targetTolerance) {
+    //       f.setpoint = newSetpoint;
+    //       debugPrintf("OSC IN → Page %d Fader %d (%s) = %d, setpoint = %.1f\n", 
+    //                  pageNum, i, address, value, f.setpoint);
+    //       moveFaderToSetpoint(f);
+    //     }
+    //     break;
+    //   }
+    // }
+
+
   }
 }
 
@@ -132,7 +156,11 @@ void handlePageUpdate(const char *address, int value) {
 
 void sendOscUpdate(Fader& f, int value, bool force) {
   unsigned long now = millis();
-  
+//Do not send osc of fader is not touched
+  if (!f.touched){
+    return;
+  }
+
   // Only send if value changed significantly or enough time passed or force flag is set
   if (force || (abs(value - f.lastSentOscValue) >= OSC_VALUE_THRESHOLD && 
       now - f.lastOscSendTime > OSC_RATE_LIMIT)) {

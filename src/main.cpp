@@ -124,7 +124,7 @@ void loop() {
   }
   
   // Process faders
-  handleFaders();
+  handleFadersSimple();
 
   
   // Process OSC messages

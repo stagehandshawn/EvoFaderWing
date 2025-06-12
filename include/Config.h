@@ -14,8 +14,8 @@
 #define SERIAL_BAUD     115200   // Baud rate for USB serial output/debug
 
 // Motor control settings
-#define DEFAULT_PWM     180      // Default motor speed (PWM duty cycle) during normal operation (0–255)
-#define CALIB_PWM       100      // Reduced motor speed during auto-calibration phase
+#define DEFAULT_PWM     60      // Default motor speed (PWM duty cycle) during normal operation (0–255)
+#define CALIB_PWM       60      // Reduced motor speed during auto-calibration phase
 #define MOTOR_DEADZONE  30       // Minimum PWM to overcome motor inertia
 
 // PID controller settings
@@ -25,8 +25,8 @@
 #define PID_SAMPLE_TIME 25       // How often (in milliseconds) PID is evaluated
 
 // Fader position tolerances
-#define TARGET_TOLERANCE 15      // How close (in analog units) fader must be to setpoint to consider "done"
-#define SEND_TOLERANCE   8       // Minimum analog change before reporting fader movement default is 1024/127 to give one logical step
+#define TARGET_TOLERANCE 2      // OSC VALUE How close (in analog units) fader must be to setpoint to consider "done"
+#define SEND_TOLERANCE   2       // Minimum analog change before reporting fader movement default is 1024/127 to give one logical step
 
 // Calibration settings
 #define PLATEAU_THRESH   2       // Threshold (analog delta) to consider that the fader has stopped moving
@@ -141,7 +141,7 @@ struct Fader {
 
   double setpoint;          // Target position
   double current;           // Current analog reading
-  double smoothedPosition;  // Filtered position
+
   double motorOutput;       // PID output
   double lastMotorOutput;   // Last motor output for velocity limiting
 
@@ -154,10 +154,6 @@ struct Fader {
   bool suppressOSCOut;     // Suppress OSC out or Not
   uint16_t oscID;           // OSC ID like 201 for /Page2/Fader201
   
-  // Filter variables
-  int readings[FILTER_SIZE];
-  int readIndex;
-  int readingsTotal;
 
   // Color variables
   uint8_t red;           // Red component (0-255)
