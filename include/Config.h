@@ -14,7 +14,7 @@
 #define SERIAL_BAUD     115200   // Baud rate for USB serial output/debug
 
 // Motor control settings
-#define DEFAULT_PWM     60      // Default motor speed (PWM duty cycle) during normal operation (0–255)
+#define DEFAULT_PWM     65      // Default motor speed (PWM duty cycle) during normal operation (0–255)
 #define CALIB_PWM       60      // Reduced motor speed during auto-calibration phase
 #define MOTOR_DEADZONE  30       // Minimum PWM to overcome motor inertia
 
@@ -26,7 +26,7 @@
 
 // Fader position tolerances
 #define TARGET_TOLERANCE 2      // OSC VALUE How close (in analog units) fader must be to setpoint to consider "done"
-#define SEND_TOLERANCE   2       // Minimum analog change before reporting fader movement default is 1024/127 to give one logical step
+#define SEND_TOLERANCE   1       // Minimum analog change before reporting fader movement default is 1024/127 to give one logical step
 
 // Calibration settings
 #define PLATEAU_THRESH   2       // Threshold (analog delta) to consider that the fader has stopped moving
@@ -144,6 +144,11 @@ struct Fader {
 
   double motorOutput;       // PID output
   double lastMotorOutput;   // Last motor output for velocity limiting
+
+
+  float pidKp;
+  float pidKi;
+  float pidKd;
 
   PID* pidController;       // Pointer to PID controller
   FaderState state;         // Current state in state machine

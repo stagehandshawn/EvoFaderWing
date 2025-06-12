@@ -2,6 +2,12 @@
 -- Copyright (C) 2024  xxpasixx
 -- Modified to only watch faders 201-210 for fader values, color values, and page updates
 -- Sends ALL data as ONE OSC message: page + fader values + color values
+-- 
+-- CONFIGURATION:
+-- Set autoResendInterval via: SetVar(GlobalVars(), "autoResendInterval", 600) 
+-- (600 = 30 seconds, since main loop runs every 0.05 seconds)
+-- Default is 300 (15 seconds)
+--
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
 -- the Free Software Foundation, either version 3 of the License, or
@@ -31,7 +37,8 @@ for _, number in ipairs(executorsToWatch) do
 end
 
 -- The speed to check executors
-local tick = 1 / 10 -- 1/10 second
+local tick = 1 / 20 -- 1/20 second = 50ms
+local resendTick = 0
 
 local function getAppearanceColor(sequence)
     local apper = sequence["APPEARANCE"]
@@ -43,7 +50,11 @@ local function getAppearanceColor(sequence)
 end
 
 local function main()
+    -- Get automatic resend interval (in 20ths of seconds) - default to 300 (15 seconds)
+    local autoResendInterval = GetVar(GlobalVars(), "autoResendInterval") or 300
+
     Printf("start pam OSC main() - watching faders 201-210 (single packet with colors)")
+    Printf("autoResendInterval: " .. autoResendInterval .. " (every " .. (autoResendInterval / 20) .. " seconds)")
 
     local destPage = 1
     local forceReload = true
@@ -55,10 +66,21 @@ local function main()
     end
 
     while (GetVar(GlobalVars(), "opdateOSC")) do
+        -- Get current auto resend interval (can be changed at runtime)
+        local autoResendInterval = GetVar(GlobalVars(), "autoResendInterval") or 300
+        
         if GetVar(GlobalVars(), "forceReload") == true then
             forceReload = true
             SetVar(GlobalVars(), "forceReload", false)
         end
+
+        -- Increment resend counter and check for automatic resend   UN COMMET FOR AUTO RESEND
+        -- resendTick = resendTick + 1
+        -- if resendTick >= autoResendInterval then
+        --     forceReload = true
+        --     resendTick = 0
+        --     Printf("Auto force reload triggered (every " .. (autoResendInterval / 20) .. " seconds)")
+        -- end
 
         local dataChanged = false
 
