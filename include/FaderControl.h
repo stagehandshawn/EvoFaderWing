@@ -30,9 +30,6 @@ void updateFaderState(Fader& f);
 // Calibration
 void calibrateFaders();
 
-
-
-
 void handleFadersSimple();
 void moveAllFadersToSetpoints();
 

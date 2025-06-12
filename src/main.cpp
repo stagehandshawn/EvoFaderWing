@@ -160,7 +160,7 @@ void loop() {
 
   // If in debug mode will check for a serial request to reboot into bootloader mode for auto upload without pressing button
   
-      checkSerialForReboot();
+    checkSerialForReboot();
 
   yield(); // Let the Teensy do background tasks
 }

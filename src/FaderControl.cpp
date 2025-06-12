@@ -38,6 +38,65 @@ void driveMotor(Fader& f, int direction) {
 }
 
 
+// Add this new function that accepts custom PWM
+void driveMotorWithPWM(Fader& f, int direction, int pwmValue) {
+  if (direction == 0) {
+    // Stop the motor
+    digitalWrite(f.dirPin1, LOW);
+    digitalWrite(f.dirPin2, LOW);
+    analogWrite(f.pwmPin, 0);
+    return;
+  }
+  
+  // Set direction pins
+  if (direction > 0) {
+    // Move up/forward
+    digitalWrite(f.dirPin1, HIGH);
+    digitalWrite(f.dirPin2, LOW);
+  } else {
+    // Move down/backward
+    digitalWrite(f.dirPin1, LOW);
+    digitalWrite(f.dirPin2, HIGH);
+  }
+  
+  // Apply custom PWM speed
+  analogWrite(f.pwmPin, pwmValue);
+  
+  if (debugMode) {
+    debugPrintf("Fader %d: Motor PWM: %d, Dir: %s, Setpoint: %d\n", 
+               f.oscID, pwmValue, direction > 0 ? "UP" : "DOWN", f.setpoint);
+  }
+}
+
+// Add this function to calculate PWM based on distance to target
+int calculateVelocityPWM(int difference) {
+  int absDifference = abs(difference);
+  
+  // Define PWM ranges
+  const int minPWM = 40;   // Minimum PWM to ensure movement (adjust as needed)
+  const int maxPWM = Fconfig.defaultPwm;  // Use your existing max PWM
+  
+  // Define distance thresholds for different speeds
+  const int slowZone = 5;   // OSC units - when to start slowing down
+  const int fastZone = 20;  // OSC units - when to use full speed
+  
+  int pwmValue;
+  
+  if (absDifference >= fastZone) {
+    // Far from target - use full speed
+    pwmValue = maxPWM;
+  } else if (absDifference <= slowZone) {
+    // Close to target - use minimum speed
+    pwmValue = minPWM;
+  } else {
+    // In between - linear interpolation
+    float ratio = (float)(absDifference - slowZone) / (fastZone - slowZone);
+    pwmValue = minPWM + (int)(ratio * (maxPWM - minPWM));
+  }
+  
+  return pwmValue;
+}
+
 //================================
 // MAIN FADER PROCESSING
 //================================
@@ -81,23 +140,43 @@ void moveAllFadersToSetpoints() {
         f.state = FADER_MOVING;
         
         // Determine direction and move
+        // if (difference > 0) {
+        //   // Need to move up
+        //   driveMotor(f, 1);
+        // } else {
+        //   // Need to move down
+        //   driveMotor(f, -1);
+        // }
+        
+
         if (difference > 0) {
           // Need to move up
-          driveMotor(f, 1);
+          int pwm = calculateVelocityPWM(difference);
+          driveMotorWithPWM(f, 1, pwm);
         } else {
-          // Need to move down
-          driveMotor(f, -1);
+          // Need to move down  
+          int pwm = calculateVelocityPWM(difference);
+          driveMotorWithPWM(f, -1, pwm);
         }
-        
+
+
+
         if (debugMode) {
           debugPrintf("Fader %d: Current OSC: %d, Target OSC: %d, Diff: %d\n", 
                      f.oscID, currentOscValue, targetOscValue, difference);
         }
-      } else {
-        // Fader is at target, stop motor
-        driveMotor(f, 0);
-        f.state = FADER_IDLE;
-      }
+
+        } else {
+          // Fader is at target, stop motor
+          driveMotorWithPWM(f, 0, 0);
+          f.state = FADER_IDLE;
+        }
+
+      // } else {
+      //   // Fader is at target, stop motor
+      //   driveMotor(f, 0);
+      //   f.state = FADER_IDLE;
+      // }
     }
     
     // Small delay to prevent overwhelming the system
@@ -159,7 +238,7 @@ void handleFadersSimple() {
       sendOscUpdate(f, currentOscValue, false);
       
       f.setpoint = currentOscValue; //i think this needs to happen
-      
+
 
       if (debugMode) {
         debugPrintf("Fader %d position update: %d\n", f.oscID, currentOscValue);

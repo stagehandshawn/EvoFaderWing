@@ -62,8 +62,8 @@ NetworkConfig netConfig = {
 // NEOPIXEL BRIGHTNESS SETTINGS
 //================================
 // Used to control LED brightness on idle vs. touch, and animate fades.
-uint8_t baseBrightness = 20;
-uint8_t touchedBrightness = 60;
+uint8_t baseBrightness = 5;
+uint8_t touchedBrightness = 40;
 unsigned long fadeTime = 1000;  // Duration in ms for brightness fade animation
 
 //================================
@@ -71,6 +71,8 @@ unsigned long fadeTime = 1000;  // Duration in ms for brightness fade animation
 //================================
 #ifdef DEBUG
   bool debugMode = true;  // Enables or disables verbose serial output
+#else
+  bool debugMode = false;  // Enables or disables verbose serial output
 #endif
 
 //================================

@@ -14,7 +14,7 @@
 #define SERIAL_BAUD     115200   // Baud rate for USB serial output/debug
 
 // Motor control settings
-#define DEFAULT_PWM     65      // Default motor speed (PWM duty cycle) during normal operation (0–255)
+#define DEFAULT_PWM     80      // Default motor speed (PWM duty cycle) during normal operation (0–255)
 #define CALIB_PWM       60      // Reduced motor speed during auto-calibration phase
 #define MOTOR_DEADZONE  30       // Minimum PWM to overcome motor inertia
 
