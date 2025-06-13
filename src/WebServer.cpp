@@ -185,7 +185,7 @@ void handleWebServer() {
         } else if (request.indexOf("touchThreshold=") >= 0) {
           requestType = 'T'; // Touch settings
           debugPrint("Determined: Touch settings");
-        } else if (request.indexOf("motorDeadzone=") >= 0 || request.indexOf("baseBrightness=") >= 0) {
+        } else if (request.indexOf("minPwm=") >= 0 || request.indexOf("baseBrightness=") >= 0) {
           requestType = 'F'; // Fader settings (including brightness)
           debugPrint("Determined: Fader settings");
         } else {
@@ -489,7 +489,7 @@ void handleFaderSettings(String request) {
   debugPrint("Handling fader settings...");
   
   // Extract and parse fader parameters
-  Fconfig.motorDeadzone = getParam(request, "motorDeadzone").toInt();
+  Fconfig.minPwm = getParam(request, "minPwm").toInt();
   Fconfig.defaultPwm = getParam(request, "defaultPwm").toInt();
   Fconfig.targetTolerance = getParam(request, "targetTolerance").toInt();
   Fconfig.sendTolerance = getParam(request, "sendTolerance").toInt();
@@ -784,11 +784,11 @@ waitForWriteSpace();
   client.println("<div class='card-body'>");
   client.println("<form method='get' action='/save'>");
   
-  // Motor Deadzone
+  // Min PWM
   client.println("<div class='form-group'>");
-  client.println("<label>Motor Deadzone</label>");
-  client.print("<input type='number' name='motorDeadzone' value='");
-  client.print(Fconfig.motorDeadzone);
+  client.println("<label>Min PWM</label>");
+  client.print("<input type='number' name='minPwm' value='");
+  client.print(Fconfig.minPwm);
   client.println("' min='0' max='100'>");
   client.println("<p class='help-text'>Minimum error before motor stops (prevents jitter)</p>");
   client.println("</div>");

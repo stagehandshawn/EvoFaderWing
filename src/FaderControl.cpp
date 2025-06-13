@@ -74,7 +74,7 @@ int calculateVelocityPWM(int difference) {
   int absDifference = abs(difference);
   
   // Define PWM ranges
-  const int minPWM = 40;   // Minimum PWM to ensure movement (adjust as needed)
+  const int minPWM = Fconfig.minPwm;   // Minimum PWM to ensure movement (adjust as needed)
   const int maxPWM = Fconfig.defaultPwm;  // Use your existing max PWM
   
   // Define distance thresholds for different speeds

@@ -32,7 +32,7 @@ const uint16_t OSC_IDS[NUM_FADERS] = {201, 202, 203, 204, 205, 206, 207, 208, 20
 //================================
 // Default PID and motor tuning settings shared across all faders.
 FaderConfig Fconfig = {
-  .motorDeadzone = MOTOR_DEADZONE,
+  .minPwm = MIN_PWM,
   .defaultPwm = DEFAULT_PWM,
   .calibratePwm = CALIB_PWM,
   .targetTolerance = TARGET_TOLERANCE,

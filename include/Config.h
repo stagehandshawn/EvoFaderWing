@@ -15,13 +15,13 @@
 #define SERIAL_BAUD     115200   // Baud rate for USB serial output/debug
 
 // Motor control settings
-#define DEFAULT_PWM     80      // Default motor speed (PWM duty cycle) during normal operation (0–255)
-#define CALIB_PWM       60      // Reduced motor speed during auto-calibration phase
-#define MOTOR_DEADZONE  30       // Minimum PWM to overcome motor inertia
+#define DEFAULT_PWM     100      // Default motor speed (PWM duty cycle) during normal operation (0–255) BEST at 100
+#define CALIB_PWM       80      // Reduced motor speed during auto-calibration phase
+#define MIN_PWM         40       // Minimum PWM to overcome motor inertia
 
 // Fader position tolerances
-#define TARGET_TOLERANCE 3      // OSC VALUE How close (in analog units) fader must be to setpoint to consider "done"
-#define SEND_TOLERANCE   1       // Also osc value now
+#define TARGET_TOLERANCE 1      // OSC VALUE How close (in analog units) fader must be to setpoint to consider "done"
+#define SEND_TOLERANCE   2       // Also osc value now
 
 // Calibration settings
 #define PLATEAU_THRESH   2       // Threshold (analog delta) to consider that the fader has stopped moving
@@ -87,7 +87,7 @@ struct NetworkConfig {
 
 // Configuration structure that can be saved to EEPROM
 struct FaderConfig {
-  uint8_t motorDeadzone;
+  uint8_t minPwm;
   uint8_t defaultPwm;
   uint8_t calibratePwm;
   uint8_t targetTolerance;

@@ -229,7 +229,7 @@ void saveAllConfig() {
 
 void resetToDefaults() {
   // Reset config to defaults using the macro values
-  Fconfig.motorDeadzone = MOTOR_DEADZONE;
+  Fconfig.minPwm = MIN_PWM;
   Fconfig.defaultPwm = DEFAULT_PWM;
   Fconfig.calibratePwm = CALIB_PWM;
   Fconfig.targetTolerance = TARGET_TOLERANCE;
@@ -301,7 +301,7 @@ void dumpEepromConfig() {
     FaderConfig storedConfig;
     EEPROM.get(EEPROM_CONFIG_DATA_ADDR, storedConfig);
     
-    debugPrintf("Motor Deadzone: %d\n", storedConfig.motorDeadzone);
+    debugPrintf("Min PWM: %d\n", storedConfig.minPwm);
     debugPrintf("Default PWM: %d\n", storedConfig.defaultPwm);
     debugPrintf("Calibration PWM: %d\n", storedConfig.calibratePwm);
     debugPrintf("Target Tolerance: %d\n", storedConfig.targetTolerance);

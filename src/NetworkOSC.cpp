@@ -3,7 +3,7 @@
 #include "NetworkOSC.h"
 #include "Utils.h"
 #include "FaderControl.h"
-
+#include "Config.h"
 
 
 //================================
@@ -136,6 +136,7 @@ void handlePageUpdate(const char *address, int value) {
 }
 
 
+// Fader updates
 
 void sendOscUpdate(Fader& f, int value, bool force) {
   unsigned long now = millis();
@@ -145,7 +146,7 @@ void sendOscUpdate(Fader& f, int value, bool force) {
   // }
 
   // Only send if value changed significantly or enough time passed or force flag is set
-  if (force || (abs(value - f.lastSentOscValue) >= OSC_VALUE_THRESHOLD && 
+  if (force || (abs(value - f.lastSentOscValue) >= Fconfig.sendTolerance && 
       now - f.lastOscSendTime > OSC_RATE_LIMIT)) {
     
     char oscAddress[32];
@@ -257,7 +258,7 @@ bool isBundleStart(const uint8_t *buf, size_t len) {
 }
 
 
-// Put together and send an OSC message 
+// Put together and send an OSC message for Key presses and Encoder turns
 
 void sendOscMessage(const char* address, const char* typeTag, const void* value) {
   uint8_t buffer[128];
