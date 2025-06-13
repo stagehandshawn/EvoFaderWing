@@ -78,8 +78,9 @@ int calculateVelocityPWM(int difference) {
   const int maxPWM = Fconfig.defaultPwm;  // Use your existing max PWM
   
   // Define distance thresholds for different speeds
-  const int slowZone = 5;   // OSC units - when to start slowing down
-  const int fastZone = 20;  // OSC units - when to use full speed
+  const int slowZone = 5;   // OSC units - when to start slowing down DEFUALT GOOD MOVMENT WITH THIS UNIT
+  const int fastZone = 20;  // OSC units - when to use full speed DEFUALT GOOD MOVMENT WITH THIS UNIT
+  
   
   int pwmValue;
   
