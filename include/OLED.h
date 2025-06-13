@@ -81,8 +81,9 @@ public:
     void showStatus(const char* status);   // Display status on last line
     void showTime(unsigned long millis);   // Display uptime/runtime
 
-    void OLED::showIPAddress(IPAddress ip, uint16_t recvPort, IPAddress sendIP, uint16_t sendPort);
-    
+//    void OLED::showIPAddress(IPAddress ip, uint16_t recvPort, IPAddress sendIP, uint16_t sendPort);
+    void showIPAddress(IPAddress ip, uint16_t recvPort, IPAddress sendIP, uint16_t sendPort);
+
     // === Public Advanced Functions ===
     void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1); // Draw line
     void drawRect(int16_t x, int16_t y, int16_t w, int16_t h);     // Draw rectangle
@@ -96,6 +97,7 @@ public:
 
     // === Debug Display Function ===
     void addDebugLine(const char* text);
+    void clearDebugLines();
 };
 
 // === External Debug Functions (assumed to exist in your project) ===

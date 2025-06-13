@@ -35,19 +35,25 @@ void pollWebServer();
 void handleWebServer();
 
 // Request handlers
-void handleRoot();
 void handleNetworkSettings(String request);
 void handleCalibrationSettings(String request);
-void handlePIDSettings(String request);
 void handleFaderSettings(String request);
 void handleTouchSettings(String request);
 void handleRunCalibration();
 void handleDebugToggle(String requestBody);
 void handleResetDefaults();
 void handleNetworkReset();
+
+// Html building functions
+void handleRoot();
 void handleStatsPage();
 void handleFaderSettingsPage();
 void handleOSCSettingsPage();
+
+void sendCommonStyles();
+void sendNavigationHeader(const char* pageTitle);
+
+void waitForWriteSpace();
 
 // Response helpers
 void send404Response();

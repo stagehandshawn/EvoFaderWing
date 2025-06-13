@@ -228,22 +228,31 @@ void handleFaders() {
 
     // Read current position and get OSC value in one call
     int currentOscValue = readFadertoOSC(f);
-    
-    if (abs(currentOscValue - f.lastReportedValue) >= Fconfig.sendTolerance) {
-      f.lastReportedValue = currentOscValue;
-      
-      // Send OSC update (assuming you have this function)
-      sendOscUpdate(f, currentOscValue, false);
-      
-      f.setpoint = currentOscValue; //i think this needs to happen
+
+      // Force send when at top or bottom and ignore rate limiting
+    bool forceSend = (currentOscValue == 0 && f.lastReportedValue != 0) ||
+                    (currentOscValue == 100 && f.lastReportedValue != 100);
+
+    if (abs(currentOscValue - f.lastReportedValue) >= Fconfig.sendTolerance || forceSend) {
+        f.lastReportedValue = currentOscValue;
+        
+        // If forcesend because fast move to top or bottom then ignore rate limiting
+        if (forceSend) {
+          sendOscUpdate(f, currentOscValue, true);
+        } else {
+          sendOscUpdate(f, currentOscValue, false);
+        }
 
 
-      if (debugMode) {
-        debugPrintf("Fader %d position update: %d\n", f.oscID, currentOscValue);
-      }
+        f.setpoint = currentOscValue;
+
+        if (debugMode) {
+          debugPrintf("Fader %d position update: %d\n", f.oscID, currentOscValue);
+        }
+    }
     }
   }
-}
+
 
 
 
@@ -255,7 +264,7 @@ int readFadertoOSC(Fader& f) {
   // Clamp near-bottom analog values to force OSC = 0
   if (analogValue <= f.minVal + 15) {
     if (debugMode) {
-      debugPrintf("Fader %d: Clamped to 0 (analog=%d, minVal=%d)\n", f.oscID, analogValue, f.minVal);
+      //debugPrintf("Fader %d: Clamped to 0 (analog=%d, minVal=%d)\n", f.oscID, analogValue, f.minVal);
     }
     return 0;
   }
@@ -263,7 +272,7 @@ int readFadertoOSC(Fader& f) {
   // Clamp near-top analog values to force OSC = 100
   if (analogValue >= f.maxVal - 15) {
     if (debugMode) {
-      debugPrintf("Fader %d: Clamped to 100 (analog=%d, maxVal=%d)\n", f.oscID, analogValue, f.maxVal);
+      //debugPrintf("Fader %d: Clamped to 100 (analog=%d, maxVal=%d)\n", f.oscID, analogValue, f.maxVal);
     }
     return 100;
   }

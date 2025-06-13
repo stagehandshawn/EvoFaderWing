@@ -7,12 +7,9 @@
 #include "TouchSensor.h"
 #include <QNEthernet.h>
 #include "NeoPixelControl.h"
+#include "OLED.h"
 
 using namespace qindesign::network;
-
-void waitForWriteSpace();
-void sendCommonStyles();
-void sendNavigationHeader(const char* pageTitle);
 
 
 //================================
@@ -318,25 +315,19 @@ void send404Response() {
   client.println("</div></body></html>");
 }
 
+
 void handleDebugToggle(String requestBody) {
-  debugPrint("Processing debug mode toggle...");
-  
-  debugPrintf("Debug toggle request body: '%s'\n", requestBody.c_str());
-  
-  // Check for debug=1 in the request body
-  // Initially set to false (default from hidden field value=0)
-  debugMode = false;
-  
-  // Then check if the checkbox value (debug=1) is present
-  if (requestBody.indexOf("debug=1") != -1) {
-    debugMode = true;
-  }
-  
-  debugPrintf("Debug mode set to: %d\n", debugMode ? 1 : 0);
-  
-  // Redirect back to main page
+  Serial.println("[Toggle] Received /debug POST request");
+  Serial.printf("[Toggle] Raw body: %s\n", requestBody.c_str());
+
+  debugMode = (requestBody.indexOf("debug=1") != -1);
+  Serial.printf("[Toggle] Debug mode is now: %d\n", debugMode);
+
+  if (!debugMode) display.clearDebugLines();
+
   sendRedirect();
 }
+
 
 void handleNetworkSettings(String request) {
   debugPrint("Handling network settings...");
@@ -641,10 +632,7 @@ void handleOSCSettings(String request) {
 }
 
 
-void handleNetworkReset() {
-  debugPrint("Resetting network settings to defaults...");
-  resetNetworkDefaults();
-  
+void handleNetworkReset() {  
   // Special response for network settings with improved styling
   client.println("HTTP/1.1 200 OK");
   client.println("Content-Type: text/html");
@@ -665,6 +653,9 @@ void handleNetworkReset() {
   client.println("<p>Network settings have been reset to defaults. For changes to take full effect, please restart the device.</p>");
   client.println("<p><a href='/'>Return to settings</a></p>");
   client.println("</div></body></html>");
+  
+  debugPrint("Resetting network settings to defaults...");
+  resetNetworkDefaults();
 }
 
 void sendRedirect() {
@@ -706,7 +697,7 @@ void sendNavigationHeader(const char* pageTitle) {
   client.println("</div>");
   
   client.println("<div class='nav'>");
-  client.println("<a href='/'>Network</a>");
+  client.println("<a href='/'>Network/Debug</a>");
   client.println("<a href='/osc_settings'>OSC</a>");
   client.println("<a href='/fader_settings'>Faders</a>");
   client.println("<a href='/stats'>Statistics</a>");
@@ -898,10 +889,10 @@ waitForWriteSpace();
   client.println(">Disabled</option>");
   client.print("<option value='1'");
   if (autoCalibrationMode == 1) client.print(" selected");
-  client.println(">Normal (Recommended)</option>");
+  client.println(">Normal (More sensitive, faster baseline changes)</option>");
   client.print("<option value='2'");
   if (autoCalibrationMode == 2) client.print(" selected");
-  client.println(">Conservative</option>");
+  client.println(">Conservative (Defualt, slower baseline changes due to environment)</option>");
   client.println("</select>");
   client.println("<p class='help-text'>Automatic baseline adjustment for environmental changes</p>");
   client.println("</div>");

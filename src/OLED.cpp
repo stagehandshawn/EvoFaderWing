@@ -404,6 +404,16 @@ void OLED::clearLine(uint8_t line, uint8_t textSize) {
     oledDisplay->fillRect(0, yPos, SCREEN_WIDTH, lineHeight, SSD1306_BLACK);
 }
 
+void OLED::clearDebugLines() {
+    // Clear all lines except the header (line 0)
+    if (!displayInitialized || !oledDisplay) return;
+    
+    for (int i = 2; i < 8; i++) {
+        clearLine(i);
+    }
+    display();
+}
+
 void OLED::showIPAddress(IPAddress ip, uint16_t recvPort, IPAddress sendIP, uint16_t sendPort) {
     if (!displayInitialized || !oledDisplay) return;
 
