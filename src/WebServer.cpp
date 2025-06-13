@@ -323,6 +323,9 @@ void handleDebugToggle(String requestBody) {
   debugMode = (requestBody.indexOf("debug=1") != -1);
   Serial.printf("[Toggle] Debug mode is now: %d\n", debugMode);
 
+    Fconfig.serialDebug = debugMode;
+    saveFaderConfig();
+
   if (!debugMode) display.clearDebugLines();
 
   sendRedirect();

@@ -68,6 +68,7 @@ void loadConfig() {
     debugPrint("No valid fader configuration in EEPROM, using defaults.");
     // Default config values already set in the struct initialization
   }
+  debugMode = Fconfig.serialDebug;
 }
 
 //================================
@@ -306,6 +307,11 @@ void dumpEepromConfig() {
     debugPrintf("Calibration PWM: %d\n", storedConfig.calibratePwm);
     debugPrintf("Target Tolerance: %d\n", storedConfig.targetTolerance);
     debugPrintf("Send Tolerance: %d\n", storedConfig.sendTolerance);
+    debugPrintf("Base Brightness: %d\n", storedConfig.baseBrightness);
+    debugPrintf("Touched Brightness: %d\n", storedConfig.touchedBrightness);
+    debugPrintf("Fade Time (ms): %d\n", storedConfig.fadeTime);
+    debugPrintf("Serial Debug: %s\n", storedConfig.serialDebug ? "Enabled" : "Disabled");
+    
   } else {
     debugPrintf("Fader config not found (signature=0x%02X, expected=0x%02X)\n", 
                EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR), FADERCFG_EEPROM_SIGNATURE);

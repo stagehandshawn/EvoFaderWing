@@ -95,6 +95,7 @@ struct FaderConfig {
   uint8_t baseBrightness;         // Default idle brightness
   uint8_t touchedBrightness;      // Brightness when fader is touched
   unsigned long fadeTime;         // Fade duration in milliseconds
+  bool serialDebug;
 };
 
 // Touch sensor configuration

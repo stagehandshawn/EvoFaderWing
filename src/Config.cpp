@@ -39,7 +39,8 @@ FaderConfig Fconfig = {
   .sendTolerance = SEND_TOLERANCE,
   .baseBrightness = 5,
   .touchedBrightness = 40,
-  .fadeTime = 1000
+  .fadeTime = 1000,
+  .serialDebug = debugMode
 };
 
 //================================
