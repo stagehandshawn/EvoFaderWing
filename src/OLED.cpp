@@ -404,14 +404,23 @@ void OLED::clearLine(uint8_t line, uint8_t textSize) {
     oledDisplay->fillRect(0, yPos, SCREEN_WIDTH, lineHeight, SSD1306_BLACK);
 }
 
-void OLED::showIPAddress(IPAddress ip) {
+void OLED::showIPAddress(IPAddress ip, uint16_t recvPort, IPAddress sendIP, uint16_t sendPort) {
     if (!displayInitialized || !oledDisplay) return;
 
-    clearLine(0);  // Clear top line (header)
+    // Clear lines to ensure clean display
+    clearLine(0);  // First line
+    clearLine(1);  // Second line
+
+    // First line: Local IP and receive port
     setCursor(0, 0);
     setTextSize(TEXT_SIZE_SMALL);
     setTextColor(SSD1306_WHITE);
-    printf("IP: %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+    printf("%d.%d.%d.%d:%d", ip[0], ip[1], ip[2], ip[3], recvPort);
+
+    // Second line: Send-to IP and port
+    setCursor(0, CHAR_HEIGHT_SMALL);
+    printf("%d.%d.%d.%d:%d", sendIP[0], sendIP[1], sendIP[2], sendIP[3], sendPort);
+
     display();
 }
 

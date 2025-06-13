@@ -19,5 +19,7 @@ extern Adafruit_NeoPixel pixels;
 // Setup and main update
 void setupNeoPixels();
 void updateNeoPixels();
+void updateBaseBrightnessPixels();
+
 
 #endif // NEOPIXEL_CONTROL_H

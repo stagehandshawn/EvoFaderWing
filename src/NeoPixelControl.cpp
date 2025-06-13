@@ -198,3 +198,24 @@ void updateBrightnessOnFaderTouchChange() {
     }
   }
 }
+
+
+// Update all faders to base brightness if not touched, and reset fade timer.
+void updateBaseBrightnessPixels() {
+  unsigned long now = millis();
+
+  for (int i = 0; i < NUM_FADERS; i++) {
+    Fader& f = faders[i];
+    if (!f.touched) {
+      f.brightnessStartTime = now;
+      f.targetBrightness = Fconfig.baseBrightness;
+      f.colorUpdated = true;
+      // Optionally, set currentBrightness directly if no fade desired:
+      // f.currentBrightness = Fconfig.baseBrightness;
+
+      if (neoPixelDebug) {
+        debugPrintf("Fader %d base brightness updated to %d", i, Fconfig.baseBrightness);
+      }
+    }
+  }
+}

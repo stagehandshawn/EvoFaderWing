@@ -81,7 +81,7 @@ public:
     void showStatus(const char* status);   // Display status on last line
     void showTime(unsigned long millis);   // Display uptime/runtime
 
-    void showIPAddress(IPAddress ip);
+    void OLED::showIPAddress(IPAddress ip, uint16_t recvPort, IPAddress sendIP, uint16_t sendPort);
     
     // === Public Advanced Functions ===
     void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1); // Draw line

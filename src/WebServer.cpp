@@ -1,4 +1,4 @@
-// WebServer.cpp - Memory Optimized Version
+// WebServer.cpp - Memory Optimized Version with Separate OSC Page
 
 #include "WebServer.h"
 #include "Utils.h"
@@ -6,10 +6,14 @@
 #include "FaderControl.h"
 #include "TouchSensor.h"
 #include <QNEthernet.h>
+#include "NeoPixelControl.h"
 
 using namespace qindesign::network;
 
 void waitForWriteSpace();
+void sendCommonStyles();
+void sendNavigationHeader(const char* pageTitle);
+
 
 //================================
 // GLOBAL NETWORK OBJECTS
@@ -66,7 +70,7 @@ void sendErrorResponse(const char* errorMsg) {
   client.println("<div class='error-container'>");
   client.println("<h1>Error</h1>");
   client.printf("<p>%s</p>", errorMsg);
-  client.println("<p><a href='/'>← Return to settings</a></p>");
+  client.println("<p><a href='/'>Return to settings</a></p>");
   client.println("</div></body></html>");
 }
 
@@ -205,6 +209,8 @@ void handleWebServer() {
         requestType = 'S'; // Stats page
       } else if (path == "/fader_settings") {
         requestType = 'G'; // Fader settings page
+      } else if (path == "/osc_settings") {
+        requestType = 'A'; // OSC settings page
       } else if (path == "/") {
         requestType = 'H'; // Home/Root page
       }
@@ -255,12 +261,18 @@ void handleWebServer() {
         case 'Z': // Reset network settings
           handleNetworkReset();
           break;
+          
         case 'S': // Stats page
-            handleStatsPage();
-            break;
+          handleStatsPage();
+          break;
+          
         case 'G': // Fader settings page
-            handleFaderSettingsPage();
-            break;
+          handleFaderSettingsPage();
+          break;
+          
+        case 'A': // OSC settings page
+          handleOSCSettingsPage();
+          break;
           
         default: // 404 or unrecognized request
           debugPrint("Unrecognized request, sending 404");
@@ -302,7 +314,7 @@ void send404Response() {
   client.println("<h1>404</h1>");
   client.println("<h2>Page Not Found</h2>");
   client.println("<p>The requested resource was not found on this server.</p>");
-  client.println("<p><a href='/'>← Return to home</a></p>");
+  client.println("<p><a href='/'>Return to home</a></p>");
   client.println("</div></body></html>");
 }
 
@@ -372,8 +384,6 @@ void handleNetworkSettings(String request) {
   netConfig.useDHCP = newDHCP;
   debugPrintf("DHCP setting: %s\n", netConfig.useDHCP ? "ENABLED" : "DISABLED");
   
-  // Save to EEPROM
-  saveNetworkConfig();
   
   // Send success response with improved styling
   client.println("HTTP/1.1 200 OK");
@@ -393,8 +403,179 @@ void handleNetworkSettings(String request) {
   client.println("<div class='success-container'>");
   client.println("<h1>Network Settings Saved</h1>");
   client.println("<p>Network settings have been saved successfully. For changes to take full effect, please restart the device.</p>");
-  client.println("<p><a href='/'>← Return to settings</a></p>");
+  client.println("<p><a href='/'>Return to settings</a></p>");
   client.println("</div></body></html>");
+
+  delay(2000);
+
+    // Save to EEPROM
+  saveNetworkConfig();
+
+}
+
+
+
+void handleOSCSettingsPage() {
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: text/html");
+  client.println("Connection: close");
+  client.println();
+  
+  client.println("<!DOCTYPE html><html><head><title>OSC Settings</title>");
+  client.println("<meta name='viewport' content='width=device-width, initial-scale=1'>");
+  sendCommonStyles();
+  client.println("</head><body>");
+  
+  sendNavigationHeader("OSC Settings");
+  
+  client.println("<div class='container'>");
+  
+  waitForWriteSpace();
+  
+  client.println("<div class='card'>");
+  client.println("<h2>OSC Settings</h2>");
+  
+  client.println("<form method='get' action='/save'>");
+  
+  client.println("<label>OSC Send IP</label>");
+  client.print("<input type='text' name='osc_sendip' value='");
+  client.print(ipToString(netConfig.sendToIP));
+  client.println("'>");
+  client.println("<p class='help'>IP address of GMA3 console</p>");
+  
+  client.println("<label>OSC Send Port</label>");
+  client.print("<input type='number' name='osc_sendport' value='");
+  client.print(netConfig.sendPort);
+  client.println("'>");
+  
+  client.println("<label>OSC Receive Port</label>");
+  client.print("<input type='number' name='osc_receiveport' value='");
+  client.print(netConfig.receivePort);
+  client.println("'>");
+  
+  client.println("<button type='submit'>Save OSC Settings</button>");
+  client.println("</form>");
+  
+  client.println("<div class='divider'></div>");
+  
+  client.println("<p><strong>Current Status:</strong></p>");
+  client.print("<p>Send to: ");
+  client.print(ipToString(netConfig.sendToIP));
+  client.print(":");
+  client.print(netConfig.sendPort);
+  client.println("</p>");
+  
+  client.print("<p>Receive on: ");
+  client.print(ipToString(Ethernet.localIP()));
+  client.print(":");
+  client.print(netConfig.receivePort);
+  client.println("</p>");
+  
+  client.println("</div>");
+  
+  client.println("</div>");
+  client.println("</body></html>");
+}
+
+void handleCalibrationSettings(String request) {
+  debugPrint("Handling calibration settings...");
+  
+  // Extract and parse calibration parameters
+  Fconfig.calibratePwm = getParam(request, "calib_pwm").toInt();
+  debugPrintf("Calibration PWM saved: %d\n", Fconfig.calibratePwm);
+  
+  // Save to EEPROM
+  saveFaderConfig();
+  
+  // Redirect back to fader settings page
+  client.println("HTTP/1.1 303 See Other");
+  client.println("Location: /fader_settings");
+  client.println("Connection: close");
+  client.println();
+}
+
+void handleFaderSettings(String request) {
+  debugPrint("Handling fader settings...");
+  
+  // Extract and parse fader parameters
+  Fconfig.motorDeadzone = getParam(request, "motorDeadzone").toInt();
+  Fconfig.defaultPwm = getParam(request, "defaultPwm").toInt();
+  Fconfig.targetTolerance = getParam(request, "targetTolerance").toInt();
+  Fconfig.sendTolerance = getParam(request, "sendTolerance").toInt();
+  
+  // NEW: Extract brightness parameters
+  String baseBrightnessStr = getParam(request, "baseBrightness");
+  String touchedBrightnessStr = getParam(request, "touchedBrightness");
+  
+  if (baseBrightnessStr.length() > 0) {
+    Fconfig.baseBrightness = baseBrightnessStr.toInt();
+    updateBaseBrightnessPixels();
+    debugPrintf("Base Brightness saved: %d\n", Fconfig.baseBrightness);
+  }
+  
+  if (touchedBrightnessStr.length() > 0) {
+    Fconfig.touchedBrightness = touchedBrightnessStr.toInt();
+    debugPrintf("Touched Brightness saved: %d\n", Fconfig.touchedBrightness);
+  }
+  
+
+  // Save to EEPROM
+  saveFaderConfig();
+  
+  // Redirect back to fader settings page
+  client.println("HTTP/1.1 303 See Other");
+  client.println("Location: /fader_settings");
+  client.println("Connection: close");
+  client.println();
+}
+
+void handleRunCalibration() {
+  debugPrint("Running fader calibration...");
+  
+  // Run the calibration process
+  calibrateFaders();
+  saveCalibration();
+
+  // Reinitialize MPR121 after calibration due to I2C hang risk
+  debugPrint("Reinitializing touch sensor after calibration...");
+  setupTouch();  // Restore I2C communication and config
+  
+  // Redirect back to fader settings page
+  client.println("HTTP/1.1 303 See Other");
+  client.println("Location: /fader_settings");
+  client.println("Connection: close");
+  client.println();
+}
+
+void handleTouchSettings(String request) {
+  debugPrint("Handling touch sensor settings...");
+  
+  // Extract and parse touch parameters
+  autoCalibrationMode = getParam(request, "autoCalMode").toInt();
+  touchThreshold = getParam(request, "touchThreshold").toInt();
+  releaseThreshold = getParam(request, "releaseThreshold").toInt();
+  
+  // Apply the settings to the touch sensor
+  setAutoTouchCalibration(autoCalibrationMode);
+  manualTouchCalibration();
+  
+  // Save to EEPROM
+  saveTouchConfig();
+  
+  // Reset MPR121
+  setupTouch();
+  
+  // Redirect back to fader settings page
+  client.println("HTTP/1.1 303 See Other");
+  client.println("Location: /fader_settings");
+  client.println("Connection: close");
+  client.println();
+}
+
+void handleResetDefaults() {
+  debugPrint("Resetting all settings to defaults...");
+  resetToDefaults();
+  sendRedirect();
 }
 
 void handleOSCSettings(String request) {
@@ -445,98 +626,20 @@ void handleOSCSettings(String request) {
   }
   
   // Save to EEPROM
-  saveNetworkConfig();
+
+  
+  // Redirect to OSC settings page instead of root
+  client.println("HTTP/1.1 303 See Other");
+  client.println("Location: /osc_settings");
+  client.println("Connection: close");
+  client.println();
+
+    saveNetworkConfig();
   
   debugPrint("OSC settings saved successfully");
-  sendRedirect();
+
 }
 
-void handleCalibrationSettings(String request) {
-  debugPrint("Handling calibration settings...");
-  
-  // Extract and parse calibration parameters
-  Fconfig.calibratePwm = getParam(request, "calib_pwm").toInt();
-  debugPrintf("Calibration PWM saved: %d\n", Fconfig.calibratePwm);
-  
-  // Save to EEPROM
-  saveFaderConfig();
-  
-  // Redirect back to main page
-  sendRedirect();
-}
-
-void handleFaderSettings(String request) {
-  debugPrint("Handling fader settings...");
-  
-  // Extract and parse fader parameters
-  Fconfig.motorDeadzone = getParam(request, "motorDeadzone").toInt();
-  Fconfig.defaultPwm = getParam(request, "defaultPwm").toInt();
-  Fconfig.targetTolerance = getParam(request, "targetTolerance").toInt();
-  Fconfig.sendTolerance = getParam(request, "sendTolerance").toInt();
-  
-  // NEW: Extract brightness parameters
-  String baseBrightnessStr = getParam(request, "baseBrightness");
-  String touchedBrightnessStr = getParam(request, "touchedBrightness");
-  
-  if (baseBrightnessStr.length() > 0) {
-    Fconfig.baseBrightness = baseBrightnessStr.toInt();
-    debugPrintf("Base Brightness saved: %d\n", Fconfig.baseBrightness);
-  }
-  
-  if (touchedBrightnessStr.length() > 0) {
-    Fconfig.touchedBrightness = touchedBrightnessStr.toInt();
-    debugPrintf("Touched Brightness saved: %d\n", Fconfig.touchedBrightness);
-  }
-  
-  // Save to EEPROM
-  saveFaderConfig();
-  
-  // Redirect back to main page
-  sendRedirect();
-}
-
-void handleRunCalibration() {
-  debugPrint("Running fader calibration...");
-  
-  // Run the calibration process
-  calibrateFaders();
-  saveCalibration();
-
-  // Reinitialize MPR121 after calibration due to I2C hang risk
-  debugPrint("Reinitializing touch sensor after calibration...");
-  setupTouch();  // Restore I2C communication and config
-  
-  // Redirect back to main page
-  sendRedirect();
-}
-
-void handleTouchSettings(String request) {
-  debugPrint("Handling touch sensor settings...");
-  
-  // Extract and parse touch parameters
-  autoCalibrationMode = getParam(request, "autoCalMode").toInt();
-  touchThreshold = getParam(request, "touchThreshold").toInt();
-  releaseThreshold = getParam(request, "releaseThreshold").toInt();
-  
-  // Apply the settings to the touch sensor
-  setAutoTouchCalibration(autoCalibrationMode);
-  manualTouchCalibration();
-  
-  // Save to EEPROM
-  saveTouchConfig();
-  
-  // Reset MPR121
-  setupTouch();
-  
-  // Redirect back to main page
-  sendRedirect();
-}
-
-void handleResetDefaults() {
-  debugPrint("Resetting all settings to defaults...");
-  resetToDefaults();
-  sendRedirect();
-}
 
 void handleNetworkReset() {
   debugPrint("Resetting network settings to defaults...");
@@ -560,7 +663,7 @@ void handleNetworkReset() {
   client.println("<div class='success-container'>");
   client.println("<h1>Network Settings Reset</h1>");
   client.println("<p>Network settings have been reset to defaults. For changes to take full effect, please restart the device.</p>");
-  client.println("<p><a href='/'>← Return to settings</a></p>");
+  client.println("<p><a href='/'>Return to settings</a></p>");
   client.println("</div></body></html>");
 }
 
@@ -574,164 +677,91 @@ void sendRedirect() {
 // Helper function to send CSS styles
 void sendCommonStyles() {
   client.println("<style>");
-  client.println(":root { --primary: #1976d2; --success: #2e7d32; --warning: #f57c00; --danger: #d32f2f; --bg: #f5f5f5; --card-bg: white; --text: #333; --text-secondary: #666; --border: #e0e0e0; }");
-  client.println("* { box-sizing: border-box; }");
-  client.println("body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background: var(--bg); color: var(--text); line-height: 1.6; }");
-  
-  // Header styling
-  client.println(".header { background: var(--primary); color: white; padding: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }");
-  client.println(".header-content { max-width: 1200px; margin: 0 auto; padding: 0 20px; }");
-  client.println(".header h1 { margin: 0; font-weight: 300; font-size: 28px; }");
-  client.println(".header p { margin: 5px 0 0 0; opacity: 0.9; font-size: 14px; }");
-  
-  // Layout
-  client.println(".container { max-width: 1200px; margin: 0 auto; padding: 20px; }");
-  client.println(".grid { display: grid; grid-template-columns: 1fr 380px; gap: 20px; }");
-  client.println("@media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }");
-  
-  // Card styling
-  client.println(".card { background: var(--card-bg); border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden; }");
-  client.println(".card-header { background: #fafafa; padding: 16px 20px; border-bottom: 1px solid var(--border); }");
-  client.println(".card-header h2 { margin: 0; font-size: 18px; font-weight: 600; color: var(--text); }");
-  client.println(".card-body { padding: 20px; }");
-  
-  // Form styling
-  client.println("form { margin: 0; }");
-  client.println(".form-group { margin-bottom: 16px; }");
-  client.println(".form-group:last-child { margin-bottom: 0; }");
-  client.println("label { display: block; font-weight: 500; margin-bottom: 6px; color: var(--text); }");
-  client.println("input[type='text'], input[type='number'], select { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; transition: border-color 0.2s; }");
-  client.println("input[type='text']:focus, input[type='number']:focus, select:focus { outline: none; border-color: var(--primary); }");
-  client.println("input[type='checkbox'] { margin-right: 8px; width: 16px; height: 16px; vertical-align: middle; }");
-  client.println(".help-text { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }");
-  
-  // Button styling
-  client.println(".btn { padding: 10px 20px; border: none; border-radius: 4px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; text-decoration: none; display: inline-block; }");
-  client.println(".btn-primary { background: var(--primary); color: white; }");
-  client.println(".btn-primary:hover { background: #1565c0; box-shadow: 0 2px 8px rgba(25,118,210,0.3); }");
-  client.println(".btn-success { background: var(--success); color: white; }");
-  client.println(".btn-success:hover { background: #256b28; box-shadow: 0 2px 8px rgba(46,125,50,0.3); }");
-  client.println(".btn-warning { background: var(--warning); color: white; }");
-  client.println(".btn-warning:hover { background: #e65100; box-shadow: 0 2px 8px rgba(245,124,0,0.3); }");
-  client.println(".btn-danger { background: var(--danger); color: white; }");
-  client.println(".btn-danger:hover { background: #b71c1c; box-shadow: 0 2px 8px rgba(211,47,47,0.3); }");
-  client.println(".btn-info { background: #0288d1; color: white; }");
-  client.println(".btn-info:hover { background: #0277bd; box-shadow: 0 2px 8px rgba(2,136,209,0.3); }");
-  client.println(".btn-block { width: 100%; }");
-  client.println(".btn-group { display: flex; gap: 10px; margin-top: 16px; }");
-  
-  // Status panel styling
-  client.println(".status-item { padding: 12px 16px; background: #f9f9f9; border-radius: 4px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }");
-  client.println(".status-label { font-weight: 500; color: var(--text); }");
-  client.println(".status-value { color: var(--text-secondary); font-family: 'Courier New', monospace; }");
-  client.println(".status-link { margin-top: 16px; }");
-  
-  // Divider
-  client.println(".divider { height: 1px; background: var(--border); margin: 24px 0; }");
-  
-  // Checkbox container
-  client.println(".checkbox-group { display: flex; align-items: center; }");
-  
+  client.println("body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f0f0f0; }");
+  client.println(".header { background: #1976d2; color: white; padding: 20px; text-align: center; }");
+  client.println(".header h1 { margin: 0; font-size: 24px; }");
+  client.println(".header p { margin: 5px 0; font-size: 14px; }");
+  client.println(".nav { background: #333; padding: 10px; text-align: center; }");
+  client.println(".nav a { color: white; text-decoration: none; padding: 5px 15px; margin: 0 5px; }");
+  client.println(".nav a:hover { background: #555; }");
+  client.println(".container { max-width: 600px; margin: 20px auto; padding: 0 20px; }");
+  client.println(".card { background: white; padding: 20px; margin-bottom: 20px; border: 1px solid #ddd; }");
+  client.println(".card h2 { margin-top: 0; font-size: 20px; border-bottom: 1px solid #ddd; padding-bottom: 10px; }");
+  client.println("input[type='text'], input[type='number'], select { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; }");
+  client.println("label { display: block; margin-top: 10px; font-weight: bold; }");
+  client.println(".help { font-size: 12px; color: #666; margin-top: 2px; }");
+  client.println("button { background: #1976d2; color: white; padding: 10px 20px; border: none; cursor: pointer; width: 100%; margin-top: 10px; }");
+  client.println("button:hover { background: #1565c0; }");
+  client.println(".divider { border-top: 1px solid #ddd; margin: 20px 0; }");
   client.println("</style>");
 }
 
 // Helper function to send navigation header
 void sendNavigationHeader(const char* pageTitle) {
   client.println("<div class='header'>");
-  client.println("<div class='header-content'>");
   client.println("<h1>GMA3 FaderWing Configuration</h1>");
-  client.print("<p>Current IP: ");
+  client.print("<p>IP: ");
   client.print(ipToString(Ethernet.localIP()));
   client.println("</p>");
-  client.println("<div style='margin-top: 15px;'>");
-  client.println("<a href='/' class='btn' style='background: white; color: #1976d2; margin-right: 10px;'>Network Settings</a>");
-  client.println("<a href='/fader_settings' class='btn' style='background: white; color: #1976d2; margin-right: 10px;'>Fader Settings</a>");
-  client.println("<a href='/stats' class='btn' style='background: white; color: #1976d2;'>Statistics</a>");
   client.println("</div>");
-  client.println("</div></div>");
+  
+  client.println("<div class='nav'>");
+  client.println("<a href='/'>Network</a>");
+  client.println("<a href='/osc_settings'>OSC</a>");
+  client.println("<a href='/fader_settings'>Faders</a>");
+  client.println("<a href='/stats'>Statistics</a>");
+  client.println("</div>");
 }
 
+
 void handleStatsPage() {
-  // Send HTTP headers
   client.println("HTTP/1.1 200 OK");
   client.println("Content-Type: text/html");
   client.println("Connection: close");
   client.println();
   
-  // Send HTML head
   client.println("<!DOCTYPE html><html><head><title>Fader Statistics</title>");
   client.println("<meta name='viewport' content='width=device-width, initial-scale=1'>");
-  
-  // Send specific styles for stats page
+  sendCommonStyles();
   client.println("<style>");
-  client.println("body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }");
-  client.println(".header { background: #1976d2; color: white; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }");
-  client.println(".header h1 { margin: 0; font-weight: 300; }");
-  client.println(".container { padding: 20px; max-width: 1200px; margin: 0 auto; }");
-  client.println(".stats-card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }");
   client.println("table { width: 100%; border-collapse: collapse; }");
-  client.println("th { background: #f5f5f5; text-align: left; padding: 12px; font-weight: 600; color: #666; border-bottom: 2px solid #e0e0e0; }");
-  client.println("td { padding: 12px; border-bottom: 1px solid #e0e0e0; }");
-  client.println("tr:hover { background: #f9f9f9; }");
-  client.println(".back-link { display: inline-block; color: white; text-decoration: none; margin-bottom: 10px; opacity: 0.8; }");
-  client.println(".back-link:hover { opacity: 1; }");
-  client.println(".status-active { color: #2e7d32; font-weight: 600; }");
-  client.println(".status-idle { color: #666; }");
-  client.println(".range-bar { height: 20px; background: #e0e0e0; border-radius: 10px; position: relative; overflow: hidden; }");
-  client.println(".range-fill { height: 100%; background: #1976d2; transition: width 0.3s; }");
-  client.println(".btn { padding: 10px 20px; border: none; border-radius: 4px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; text-decoration: none; display: inline-block; }");
-  client.println("</style></head><body>");
+  client.println("th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }");
+  client.println("th { background: #f0f0f0; }");
+  client.println("</style>");
+  client.println("</head><body>");
   
-  // Send navigation header
-  sendNavigationHeader("Fader Statistics");
+  sendNavigationHeader("Statistics");
   
-  // Send main content
   client.println("<div class='container'>");
-  client.println("<div class='stats-card'>");
-  client.println("<table>");
-  client.println("<tr><th>Fader</th><th>Current Value</th><th>Min</th><th>Max</th><th>Range</th><th>Visual Range</th><th>OSC Value</th></tr>");
+  client.println("<div class='card'>");
+  client.println("<h2>Fader Statistics</h2>");
   
-  // Send fader data
+  client.println("<table>");
+  client.println("<tr><th>Fader</th><th>Current</th><th>Min</th><th>Max</th><th>OSC Value</th></tr>");
+  
   for (int i = 0; i < NUM_FADERS; i++) {
     Fader& f = faders[i];
     int currentVal = analogRead(f.analogPin);
-    int range = f.maxVal - f.minVal;
-    float percentage = (range > 0) ? ((float)(currentVal - f.minVal) / range * 100) : 0;
     
-    client.print("<tr>");
-    client.print("<td><strong>Fader ");
+    client.print("<tr><td>Fader ");
     client.print(i + 1);
-    client.println("</strong></td>");
-    
-    client.print("<td>");
+    client.print("</td><td>");
     client.print(currentVal);
-    client.println("</td>");
-    
-    client.print("<td>");
+    client.print("</td><td>");
     client.print(f.minVal);
-    client.println("</td>");
-    
-    client.print("<td>");
+    client.print("</td><td>");
     client.print(f.maxVal);
-    client.println("</td>");
-    
-    client.print("<td>");
-    client.print(range);
-    client.println("</td>");
-    
-    client.print("<td><div class='range-bar'><div class='range-fill' style='width: ");
-    client.print(percentage);
-    client.println("%;'></div></div></td>");
-    
-    client.print("<td>");
+    client.print("</td><td>");
     client.print(readFadertoOSC(faders[i]));
-    client.println("</td>");
+    client.println("</td></tr>");
     
-    client.println("</tr>");
+    if (i % 3 == 0) waitForWriteSpace();
   }
   
   client.println("</table>");
-  client.println("</div></div></body></html>");
+  client.println("</div>");
+  client.println("</div>");
+  client.println("</body></html>");
 }
 
 void handleFaderSettingsPage() {
@@ -895,7 +925,7 @@ waitForWriteSpace();
   client.println("</div>");
   
   client.println("<button type='submit' class='btn btn-primary btn-block'>Save Touch Settings</button>");
-  client.println("<p class='help-text' style='margin-top: 12px; color: var(--warning);'>⚠️ Do not touch faders while saving</p>");
+  client.println("<p class='help-text' style='margin-top: 12px; color: red;'>Do not touch faders while saving</p>");
   client.println("</form></div></div>");
   
   client.println("</div>"); // End container
@@ -903,9 +933,8 @@ waitForWriteSpace();
 }
 
 //================================
-// MAIN WEB PAGE HANDLER
+// MAIN WEB PAGE HANDLER (ROOT - Network Settings)
 //================================
-
 void handleRoot() {
   // Send HTTP headers
   client.println("HTTP/1.1 200 OK");
@@ -914,203 +943,91 @@ void handleRoot() {
   client.println();
   
   // Send HTML head
-  client.println("<!DOCTYPE html><html><head><title>Fader Configuration</title>");
+  client.println("<!DOCTYPE html><html><head><title>Network Settings</title>");
   client.println("<meta name='viewport' content='width=device-width, initial-scale=1'>");
-  
-  // Send common styles
   sendCommonStyles();
   client.println("</head><body>");
   
   // Send navigation header
   sendNavigationHeader("Network Settings");
   
-  // Main container
   client.println("<div class='container'>");
-  client.println("<div class='grid'>");
   
-  // Left column - Settings
-  client.println("<div class='left-column'>");
+  waitForWriteSpace();
   
   // Network Settings Card
   client.println("<div class='card'>");
-  client.println("<div class='card-header'><h2>Network Settings</h2></div>");
-  client.println("<div class='card-body'>");
+  client.println("<h2>Network Settings</h2>");
+  
   client.println("<form method='get' action='/save'>");
   
-  client.println("<div class='form-group'>");
-  client.println("<div class='checkbox-group'>");
-  client.print("<label><input type='checkbox' name='dhcp' value='on'");
+  client.println("<label>");
+  client.print("<input type='checkbox' name='dhcp' value='on'");
   if (netConfig.useDHCP) client.print(" checked");
-  client.println(">Use DHCP</label>");
-  client.println("</div>");
-  client.println("<p class='help-text'>When enabled, static IP settings below are ignored</p>");
-  client.println("</div>");
+  client.println("> Use DHCP");
+  client.println("</label>");
+  client.println("<p class='help'>When enabled, static IP settings below are ignored</p>");
   
-  client.println("<div class='form-group'>");
   client.println("<label>Static IP Address</label>");
   client.print("<input type='text' name='ip' value='");
   client.print(ipToString(netConfig.staticIP));
-  client.println("' placeholder='192.168.1.100'>");
-  client.println("</div>");
+  client.println("'>");
   
-  client.println("<div class='form-group'>");
   client.println("<label>Gateway</label>");
   client.print("<input type='text' name='gw' value='");
   client.print(ipToString(netConfig.gateway));
-  client.println("' placeholder='192.168.1.1'>");
-  client.println("</div>");
+  client.println("'>");
   
-  client.println("<div class='form-group'>");
   client.println("<label>Subnet Mask</label>");
   client.print("<input type='text' name='sn' value='");
   client.print(ipToString(netConfig.subnet));
-  client.println("' placeholder='255.255.255.0'>");
-  client.println("</div>");
+  client.println("'>");
   
-waitForWriteSpace();
-
-  client.println("<div class='btn-group'>");
-  client.println("<button type='submit' class='btn btn-primary'>Save Network Settings</button>");
+  client.println("<button type='submit'>Save Network Settings</button>");
   client.println("</form>");
-  client.println("<form method='post' action='/reset_network' style='margin:0;'>");
-  client.println("<button type='submit' class='btn btn-warning' onclick=\"return confirm('Reset network settings to defaults?');\">Reset Network</button>");
+  
+  client.println("<form method='post' action='/reset_network'>");
+  client.println("<button type='submit' onclick=\"return confirm('Reset network settings?');\">Reset Network</button>");
   client.println("</form>");
-  client.println("</div></div></div>");
   
-  // OSC Settings Card
-  client.println("<div class='card' style='margin-top: 20px;'>");
-  client.println("<div class='card-header'><h2>OSC Communication</h2></div>");
-  client.println("<div class='card-body'>");
-  client.println("<form method='get' action='/save'>");
-  
-  client.println("<div class='form-group'>");
-  client.println("<label>OSC Send IP</label>");
-  client.print("<input type='text' name='osc_sendip' value='");
-  client.print(ipToString(netConfig.sendToIP));
-  client.println("' placeholder='192.168.1.50'>");
-  client.println("<p class='help-text'>IP address of your DAW/software to receive OSC messages</p>");
   client.println("</div>");
   
-  client.println("<div class='form-group'>");
-  client.println("<label>OSC Send Port</label>");
-  client.print("<input type='number' name='osc_sendport' value='");
-  client.print(netConfig.sendPort);
-  client.println("' min='1' max='65535' placeholder='9000'>");
-  client.println("</div>");
-  
-  client.println("<div class='form-group'>");
-  client.println("<label>OSC Receive Port</label>");
-  client.print("<input type='number' name='osc_receiveport' value='");
-  client.print(netConfig.receivePort);
-  client.println("' min='1' max='65535' placeholder='8000'>");
-  client.println("</div>");
-  
-waitForWriteSpace();
-
-  client.println("<button type='submit' class='btn btn-primary btn-block'>Save OSC Settings</button>");
-  client.println("</form></div></div>");
-  
-  // Navigation Card for Fader Settings
-  client.println("<div class='card' style='margin-top: 20px;'>");
-  client.println("<div class='card-header'><h2>Fader Configuration</h2></div>");
-  client.println("<div class='card-body'>");
-  client.println("<p style='margin-bottom: 16px;'>Configure motor settings, LED brightness, calibration, and touch sensor parameters.</p>");
-  client.println("<a href='/fader_settings' class='btn btn-primary btn-block'>Go to Fader Settings →</a>");
-  client.println("</div></div>");
-  
-  client.println("</div>"); // End left column
-  
-  // Right column - Status and Tools
-  client.println("<div class='right-column'>");
-  
-  // Status Card
-  client.println("<div class='card'>");
-  client.println("<div class='card-header'><h2>System Status</h2></div>");
-  client.println("<div class='card-body'>");
-  
-  client.println("<div class='status-item'>");
-  client.println("<span class='status-label'>Current IP</span>");
-  client.print("<span class='status-value'>");
-  client.print(ipToString(Ethernet.localIP()));
-  client.println("</span>");
-  client.println("</div>");
-  
-  client.println("<div class='status-item'>");
-  client.println("<span class='status-label'>DHCP Status</span>");
-  client.print("<span class='status-value'>");
-  client.print(netConfig.useDHCP ? "Enabled" : "Disabled");
-  client.println("</span>");
-  client.println("</div>");
-  
-  client.println("<div class='status-item'>");
-  client.println("<span class='status-label'>OSC Target</span>");
-  client.print("<span class='status-value'>");
-  client.print(ipToString(netConfig.sendToIP));
-  client.print(":");
-  client.print(netConfig.sendPort);
-  client.println("</span>");
-  client.println("</div>");
-  
-waitForWriteSpace();
-
-  client.println("<div class='status-item'>");
-  client.println("<span class='status-label'>Debug Mode</span>");
-  client.print("<span class='status-value'>");
-  client.print(debugMode ? "Active" : "Inactive");
-  client.println("</span>");
-  client.println("</div>");
-  
-  client.println("<div class='status-link'>");
-  client.println("<a href='/fader_settings' class='btn btn-primary btn-block'>Configure Fader Settings</a>");
-  client.println("</div>");
-  
-  client.println("<div class='status-link' style='margin-top: 10px;'>");
-  client.println("<a href='/stats' class='btn btn-info btn-block'>View Fader Statistics</a>");
-  client.println("</div>");
-  
-  client.println("</div></div>");
+  waitForWriteSpace();
   
   // Debug Tools Card
-  client.println("<div class='card' style='margin-top: 20px;'>");
-  client.println("<div class='card-header'><h2>Debug Tools</h2></div>");
-  client.println("<div class='card-body'>");
+  client.println("<div class='card'>");
+  client.println("<h2>Debug Tools</h2>");
   
   client.println("<form method='post' action='/debug'>");
   client.println("<input type='hidden' name='debug' value='0'>");
-  client.println("<div class='form-group'>");
-  client.println("<div class='checkbox-group'>");
-  client.print("<label><input type='checkbox' name='debug' value='1'");
+  client.println("<label>");
+  client.print("<input type='checkbox' name='debug' value='1'");
   if (debugMode) client.print(" checked");
-  client.println(">Enable Serial Debug Output</label>");
-  client.println("</div>");
-  client.println("</div>");
-  client.println("<button type='submit' class='btn btn-primary btn-block'>Save Debug Setting</button>");
+  client.println("> Enable Serial Debug Output");
+  client.println("</label>");
+  client.println("<button type='submit'>Save Debug Setting</button>");
   client.println("</form>");
   
   client.println("<div class='divider'></div>");
   
   client.println("<form method='post' action='/dump'>");
-  client.println("<button type='submit' class='btn btn-warning btn-block'>Dump EEPROM to Serial</button>");
+  client.println("<button type='submit'>Dump EEPROM to Serial</button>");
   client.println("</form>");
   
-  client.println("</div></div>");
+  client.println("</div>");
   
-waitForWriteSpace();
-
+  waitForWriteSpace();
+  
   // Factory Reset Card
-  client.println("<div class='card' style='margin-top: 20px;'>");
-  client.println("<div class='card-header'><h2>Factory Reset</h2></div>");
-  client.println("<div class='card-body'>");
-  client.println("<p style='margin-bottom: 16px; color: var(--text-secondary);'>This will reset all settings to factory defaults. Network settings will require a device restart to take effect.</p>");
+  client.println("<div class='card'>");
+  client.println("<h2>Factory Reset</h2>");
+  client.println("<p>This will reset all settings to factory defaults.</p>");
   client.println("<form method='post' action='/reset_defaults'>");
-  client.println("<button type='submit' class='btn btn-danger btn-block' onclick=\"return confirm('Are you sure you want to reset ALL settings to defaults?');\">Reset All Settings</button>");
+  client.println("<button type='submit' onclick=\"return confirm('Reset ALL settings?');\">Reset All Settings</button>");
   client.println("</form>");
-  client.println("</div></div>");
+  client.println("</div>");
   
-  client.println("</div>"); // End right column
-  client.println("</div>"); // End grid
   client.println("</div>"); // End container
-  
   client.println("</body></html>");
 }
 

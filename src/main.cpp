@@ -171,6 +171,6 @@ void displayIPAddress(){
   display.clear();
   // Show IP address
   currentIP = Ethernet.localIP();
-  display.showIPAddress(currentIP);
+  display.showIPAddress(currentIP,netConfig.receivePort,netConfig.sendToIP,netConfig.sendPort);
 
 }

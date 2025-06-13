@@ -5,6 +5,7 @@
 #include "Utils.h"
 #include <EEPROM.h>
 #include "FaderControl.h"
+#include "NetworkOSC.h"
 
 //================================
 // CALIBRATION FUNCTIONS
@@ -94,7 +95,39 @@ void saveNetworkConfig() {
   // DHCP flag
   EEPROM.write(addr++, netConfig.useDHCP ? 1 : 0);
  
-  debugPrint("Network config saved to EEPROM.");
+  bool configChanged = false;
+  int checkAddr = NETCFG_EEPROM_ADDR + 1; // Skip signature
+  NetworkConfig oldConfig;
+
+  // Load old staticIP
+  for (int i = 0; i < 4; i++) oldConfig.staticIP[i] = EEPROM.read(checkAddr++);
+  // Load old gateway
+  for (int i = 0; i < 4; i++) oldConfig.gateway[i] = EEPROM.read(checkAddr++);
+  // Load old subnet
+  for (int i = 0; i < 4; i++) oldConfig.subnet[i] = EEPROM.read(checkAddr++);
+  // Load old sendToIP
+  for (int i = 0; i < 4; i++) oldConfig.sendToIP[i] = EEPROM.read(checkAddr++);
+  // Load old ports
+  EEPROM.get(checkAddr, oldConfig.receivePort); checkAddr += sizeof(uint16_t);
+  EEPROM.get(checkAddr, oldConfig.sendPort);    checkAddr += sizeof(uint16_t);
+  // Load old DHCP flag
+  oldConfig.useDHCP = EEPROM.read(checkAddr++) ? true : false;
+
+  // Check if any relevant values have changed
+  for (int i = 0; i < 4; i++) {
+    if (oldConfig.staticIP[i] != netConfig.staticIP[i]) configChanged = true;
+    if (oldConfig.gateway[i] != netConfig.gateway[i]) configChanged = true;
+    if (oldConfig.subnet[i] != netConfig.subnet[i]) configChanged = true;
+  }
+  if (oldConfig.useDHCP != netConfig.useDHCP) configChanged = true;
+  //if (oldConfig.receivePort != netConfig.receivePort || oldConfig.sendPort != netConfig.sendPort) configChanged = true;
+
+  if (configChanged) {
+    Ethernet.end();
+    setupNetwork();  // includes udp.begin(newReceivePort)
+  }
+
+  displayIPAddress();
 }
  
 bool loadNetworkConfig() {
@@ -115,6 +148,7 @@ bool loadNetworkConfig() {
  
   netConfig.useDHCP = EEPROM.read(addr++) ? true : false;
  
+
   debugPrint("Network config loaded from EEPROM.");
   return true;
 }

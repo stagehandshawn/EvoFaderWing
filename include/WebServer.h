@@ -47,6 +47,7 @@ void handleResetDefaults();
 void handleNetworkReset();
 void handleStatsPage();
 void handleFaderSettingsPage();
+void handleOSCSettingsPage();
 
 // Response helpers
 void send404Response();
