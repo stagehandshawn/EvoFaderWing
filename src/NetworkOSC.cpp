@@ -216,6 +216,79 @@ void handleColorOsc(const char *address, const char *colorString) {
 //================================
 // OSC UTILITY FUNCTIONS
 //================================
+void parseDualColorValues(const char *colorString, Fader& f) {
+  char buffer[128];  // Increased buffer size for 8 color values
+  strncpy(buffer, colorString, 127);
+  buffer[127] = '\0'; // Ensure null-termination
+  
+  // Parse primary color (first 4 values: R1;G1;B1;A1)
+  int primaryRed = 0, primaryGreen = 0, primaryBlue = 0;
+  int secondaryRed = 0, secondaryGreen = 0, secondaryBlue = 0;
+  
+  char *ptr = strtok(buffer, ";");
+  if (ptr != NULL) {
+    primaryRed = constrain(atoi(ptr), 0, 255);
+    
+    ptr = strtok(NULL, ";");
+    if (ptr != NULL) {
+      primaryGreen = constrain(atoi(ptr), 0, 255);
+      
+      ptr = strtok(NULL, ";");
+      if (ptr != NULL) {
+        primaryBlue = constrain(atoi(ptr), 0, 255);
+        
+        // Skip primary alpha (4th value)
+        ptr = strtok(NULL, ";");
+        if (ptr != NULL) {
+          // Parse secondary color (next 4 values: R2;G2;B2;A2)
+          ptr = strtok(NULL, ";");
+          if (ptr != NULL) {
+            secondaryRed = constrain(atoi(ptr), 0, 255);
+            
+            ptr = strtok(NULL, ";");
+            if (ptr != NULL) {
+              secondaryGreen = constrain(atoi(ptr), 0, 255);
+              
+              ptr = strtok(NULL, ";");
+              if (ptr != NULL) {
+                secondaryBlue = constrain(atoi(ptr), 0, 255);
+                // Secondary alpha (8th value) is ignored
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // NEW: Logic to choose between primary and secondary color
+  if (primaryRed == 0 && primaryGreen == 0 && primaryBlue == 0) {
+    // Primary is all zeros (black/off), use secondary color
+    f.red = secondaryRed;
+    f.green = secondaryGreen;
+    f.blue = secondaryBlue;
+    
+    if (debugMode) {
+      debugPrintf("Fader %d: Primary color is black, using secondary RGB(%d,%d,%d)\n", 
+                 f.oscID, secondaryRed, secondaryGreen, secondaryBlue);
+    }
+  } else {
+    // Primary has color, use it
+    f.red = primaryRed;
+    f.green = primaryGreen;
+    f.blue = primaryBlue;
+    
+    if (debugMode) {
+      debugPrintf("Fader %d: Using primary RGB(%d,%d,%d)\n", 
+                 f.oscID, primaryRed, primaryGreen, primaryBlue);
+    }
+  }
+  
+  // Mark that color has been updated
+  f.colorUpdated = true;
+}
+
+
 
 // Parse color values from a string like "255;157;0;255"
 void parseColorValues(const char *colorString, Fader& f) {
@@ -388,7 +461,7 @@ void handleBundledFaderUpdate(LiteOSCParser& parser) {
     
     if (faderIndex >= 0 && faderIndex < NUM_FADERS && !faders[faderIndex].touched) {
       // Parse and update color values
-      parseColorValues(colorString, faders[faderIndex]);
+      parseDualColorValues(colorString, faders[faderIndex]);
       //debugPrintf("Updated color for fader %d: %s\n", faderOscID, colorString);
     } else {
       debugPrintf("Fader index not found for color update, OSC ID %d\n", faderOscID);

@@ -17,7 +17,7 @@
 // Motor control settings
 #define DEFAULT_PWM     100      // Default motor speed (PWM duty cycle) during normal operation (0–255) BEST at 100
 #define CALIB_PWM       80      // Reduced motor speed during auto-calibration phase
-#define MIN_PWM         40       // Minimum PWM to overcome motor inertia
+#define MIN_PWM         45       // Minimum PWM to overcome motor inertia
 
 // Fader position tolerances
 #define TARGET_TOLERANCE 1      // OSC VALUE How close (in analog units) fader must be to setpoint to consider "done"
