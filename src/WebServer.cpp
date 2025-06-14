@@ -49,6 +49,16 @@ bool isValidPort(int port) {
   return (port >= 1 && port <= 65535);
 }
 
+int constrainParam(int value, int minVal, int maxVal, int defaultVal) {
+  if (value < minVal || value > maxVal) {
+    debugPrintf("Warning: Value %d out of range [%d-%d], using default %d\n", 
+                value, minVal, maxVal, defaultVal);
+    return defaultVal;
+  }
+  return value;
+}
+
+
 void sendErrorResponse(const char* errorMsg) {
   client.println("HTTP/1.1 400 Bad Request");
   client.println("Content-Type: text/html");
@@ -474,44 +484,81 @@ void handleOSCSettingsPage() {
 void handleCalibrationSettings(String request) {
   debugPrint("Handling calibration settings...");
   
-  // Extract and parse calibration parameters
-  Fconfig.calibratePwm = getParam(request, "calib_pwm").toInt();
-  debugPrintf("Calibration PWM saved: %d\n", Fconfig.calibratePwm);
+  String calibPwmStr = getParam(request, "calib_pwm");
   
-  // Save to EEPROM
-  saveFaderConfig();
-  
-  // Redirect back to fader settings page
-  client.println("HTTP/1.1 303 See Other");
-  client.println("Location: /fader_settings");
-  client.println("Connection: close");
-  client.println();
+  if (calibPwmStr.length() > 0) {
+    int calibPwm = calibPwmStr.toInt();
+    
+    // Use constrainParam for validation
+    Fconfig.calibratePwm = constrainParam(calibPwm, 0, 255, Fconfig.calibratePwm);
+    debugPrintf("Calibration PWM saved: %d\n", Fconfig.calibratePwm);
+    
+    // Save to EEPROM
+    saveFaderConfig();
+    
+    // Redirect back to fader settings page
+    client.println("HTTP/1.1 303 See Other");
+    client.println("Location: /fader_settings");
+    client.println("Connection: close");
+    client.println();
+  } else {
+    sendErrorResponse("Missing calibration PWM parameter");
+    return;
+  }
 }
 
 void handleFaderSettings(String request) {
   debugPrint("Handling fader settings...");
   
-  // Extract and parse fader parameters
-  Fconfig.minPwm = getParam(request, "minPwm").toInt();
-  Fconfig.defaultPwm = getParam(request, "defaultPwm").toInt();
-  Fconfig.targetTolerance = getParam(request, "targetTolerance").toInt();
-  Fconfig.sendTolerance = getParam(request, "sendTolerance").toInt();
-  
-  // NEW: Extract brightness parameters
+  // Extract parameter strings
+  String minPwmStr = getParam(request, "minPwm");
+  String defaultPwmStr = getParam(request, "defaultPwm");
+  String targetToleranceStr = getParam(request, "targetTolerance");
+  String sendToleranceStr = getParam(request, "sendTolerance");
   String baseBrightnessStr = getParam(request, "baseBrightness");
   String touchedBrightnessStr = getParam(request, "touchedBrightness");
   
+  // Validate and update using constrainParam
+  if (minPwmStr.length() > 0) {
+    int minPwm = minPwmStr.toInt();
+    Fconfig.minPwm = constrainParam(minPwm, 0, 255, Fconfig.minPwm);
+  }
+  
+  if (defaultPwmStr.length() > 0) {
+    int defaultPwm = defaultPwmStr.toInt();
+    Fconfig.defaultPwm = constrainParam(defaultPwm, 0, 255, Fconfig.defaultPwm);
+  }
+  
+  if (targetToleranceStr.length() > 0) {
+    int targetTolerance = targetToleranceStr.toInt();
+    Fconfig.targetTolerance = constrainParam(targetTolerance, 0, 100, Fconfig.targetTolerance);
+  }
+  
+  if (sendToleranceStr.length() > 0) {
+    int sendTolerance = sendToleranceStr.toInt();
+    Fconfig.sendTolerance = constrainParam(sendTolerance, 0, 100, Fconfig.sendTolerance);
+  }
+  
   if (baseBrightnessStr.length() > 0) {
-    Fconfig.baseBrightness = baseBrightnessStr.toInt();
+    int baseBrightness = baseBrightnessStr.toInt();
+    Fconfig.baseBrightness = constrainParam(baseBrightness, 0, 255, Fconfig.baseBrightness);
     updateBaseBrightnessPixels();
     debugPrintf("Base Brightness saved: %d\n", Fconfig.baseBrightness);
   }
   
   if (touchedBrightnessStr.length() > 0) {
-    Fconfig.touchedBrightness = touchedBrightnessStr.toInt();
+    int touchedBrightness = touchedBrightnessStr.toInt();
+    Fconfig.touchedBrightness = constrainParam(touchedBrightness, 0, 255, Fconfig.touchedBrightness);
     debugPrintf("Touched Brightness saved: %d\n", Fconfig.touchedBrightness);
   }
   
+  // Additional logical validation
+  if (Fconfig.minPwm > Fconfig.defaultPwm) {
+    debugPrint("Warning: Min PWM is greater than Default PWM, swapping values");
+    int temp = Fconfig.minPwm;
+    Fconfig.minPwm = Fconfig.defaultPwm;
+    Fconfig.defaultPwm = temp;
+  }
 
   // Save to EEPROM
   saveFaderConfig();
@@ -544,10 +591,35 @@ void handleRunCalibration() {
 void handleTouchSettings(String request) {
   debugPrint("Handling touch sensor settings...");
   
-  // Extract and parse touch parameters
-  autoCalibrationMode = getParam(request, "autoCalMode").toInt();
-  touchThreshold = getParam(request, "touchThreshold").toInt();
-  releaseThreshold = getParam(request, "releaseThreshold").toInt();
+  String autoCalModeStr = getParam(request, "autoCalMode");
+  String touchThresholdStr = getParam(request, "touchThreshold");
+  String releaseThresholdStr = getParam(request, "releaseThreshold");
+  
+  // Validate and update using constrainParam
+  if (autoCalModeStr.length() > 0) {
+    int autoCalMode = autoCalModeStr.toInt();
+    autoCalibrationMode = constrainParam(autoCalMode, 0, 2, autoCalibrationMode);
+  }
+  
+  if (touchThresholdStr.length() > 0) {
+    int threshold = touchThresholdStr.toInt();
+    touchThreshold = constrainParam(threshold, 1, 255, touchThreshold);
+  }
+  
+  if (releaseThresholdStr.length() > 0) {
+    int threshold = releaseThresholdStr.toInt();
+    releaseThreshold = constrainParam(threshold, 1, 255, releaseThreshold);
+  }
+  
+  // Additional logical validation - ensure release < touch
+  if (releaseThreshold >= touchThreshold) {
+    debugPrint("Warning: Release threshold >= touch threshold, adjusting");
+    releaseThreshold = touchThreshold - 1;
+    if (releaseThreshold < 1) {
+      releaseThreshold = 1;
+      touchThreshold = 2;
+    }
+  }
   
   // Apply the settings to the touch sensor
   setAutoTouchCalibration(autoCalibrationMode);
@@ -792,8 +864,8 @@ waitForWriteSpace();
   client.println("<label>Min PWM</label>");
   client.print("<input type='number' name='minPwm' value='");
   client.print(Fconfig.minPwm);
-  client.println("' min='0' max='100'>");
-  client.println("<p class='help-text'>Minimum error before motor stops (prevents jitter)</p>");
+  client.println("' min='0' max='255'>");
+  client.println("<p class='help-text'>Minimum motor speed (too low stalls motor, too high passes setpoint and causes jitter) (0-255)</p>");
   client.println("</div>");
   
   // Default PWM
