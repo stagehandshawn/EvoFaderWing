@@ -8,6 +8,7 @@
 #include <QNEthernet.h>
 #include "NeoPixelControl.h"
 #include "OLED.h"
+#include "NetworkOSC.h"
 
 using namespace qindesign::network;
 
@@ -406,7 +407,7 @@ void handleNetworkSettings(String request) {
   client.println("</style></head><body>");
   client.println("<div class='success-container'>");
   client.println("<h1>Network Settings Saved</h1>");
-  client.println("<p>Network settings have been saved successfully. For changes to take full effect, please restart the device.</p>");
+  client.println("<p>Network settings have been saved successfully. For changes to take full effect, you may have to restart the device.</p>");
   client.println("<p><a href='/'>Return to settings</a></p>");
   client.println("</div></body></html>");
 
@@ -683,6 +684,7 @@ void handleOSCSettings(String request) {
     int newReceivePort = receivePortStr.toInt();
     if (isValidPort(newReceivePort)) {
       netConfig.receivePort = newReceivePort;
+      // NEED TO UPDATE UDP HANDLER
       debugPrintf("Updated OSC Receive Port: %d\n", netConfig.receivePort);
     } else {
       debugPrintf("ERROR: Invalid OSC receive port: %d\n", newReceivePort);
@@ -694,14 +696,31 @@ void handleOSCSettings(String request) {
   // Save to EEPROM
 
   
-  // Redirect to OSC settings page instead of root
-  client.println("HTTP/1.1 303 See Other");
-  client.println("Location: /osc_settings");
+ // Send success response with improved styling
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: text/html");
   client.println("Connection: close");
   client.println();
+  client.println("<html><head>");
+  client.println("<meta name='viewport' content='width=device-width, initial-scale=1'>");
+  client.println("<style>");
+  client.println("body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }");
+  client.println(".success-container { background: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 500px; margin: 50px auto; }");
+  client.println("h1 { color: #2e7d32; margin-top: 0; }");
+  client.println("p { color: #666; line-height: 1.6; }");
+  client.println("a { color: #1976d2; text-decoration: none; font-weight: 500; }");
+  client.println("a:hover { text-decoration: underline; }");
+  client.println("</style></head><body>");
+  client.println("<div class='success-container'>");
+  client.println("<h1>OSC Settings Saved</h1>");
+  client.println("<p>OSC settings have been saved successfully. For changes to take full effect, you may have to restart the device.</p>");
+  client.println("<p><a href='/osc_settings'>Return to OSC settings</a></p>");
+  client.println("</div></body></html>");
 
     saveNetworkConfig();
-  
+    
+    restartUDP();
+
   debugPrint("OSC settings saved successfully");
 
 }

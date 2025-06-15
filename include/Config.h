@@ -176,6 +176,7 @@ extern bool checkForReset;
 extern unsigned long resetCheckStartTime;
 
 void displayIPAddress();
+void displayShowResetHeader();
 
 // Debug setting
 extern bool debugMode;

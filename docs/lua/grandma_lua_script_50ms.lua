@@ -1,9 +1,7 @@
--- grandma_lua_lua_script_50ms.lua
-
-
+-- EVOFaderWing Lua script for syncing EVOFaderWing using OSC
 -- Sends ALL data as ONE OSC message: page + fader values (0-100) + color values
--- 
--- CONFIGURATION:
+-- OSC sent when data has changed or after autoResendInterval
+--
 -- Set autoResendInterval via: SetVar(GlobalVars(), "autoResendInterval", 600) 
 -- (600 = 30 seconds, since main loop runs every 0.05 seconds)
 -- Default is 300 (15 seconds)

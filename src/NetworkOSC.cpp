@@ -47,6 +47,24 @@ void setupNetwork() {
   debugPrint("OSC and mDNS initialized");
 }
 
+void restartUDP() {
+  debugPrint("Restarting UDP service...");
+
+  udp.begin(0); // Safely close the previous socket
+  delay(10);    // Optional: short delay to ensure socket is cleared
+
+  if (udp.begin(netConfig.receivePort)) {
+    debugPrintf("UDP restarted on port %d\n", netConfig.receivePort);
+  } else {
+    debugPrint("Failed to restart UDP.");
+  }
+
+  // Re-register mDNS if needed
+  MDNS.addService("_osc", "_udp", netConfig.receivePort);
+}
+
+
+
 //================================
 // OSC MESSAGE HANDLING
 //================================

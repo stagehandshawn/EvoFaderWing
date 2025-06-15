@@ -28,6 +28,8 @@ void handleOscPacket(const char *address, int value);
 void sendOscUpdate(Fader& f, int value, bool force = false);
 void handleColorOsc(const char *address, const char *colorString);
 
+void restartUDP();
+
 void handleOscMovement(const char *address, int value);
 void handleOscMessage();
 

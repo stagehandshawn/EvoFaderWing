@@ -211,6 +211,8 @@ void processKeypressData(uint8_t count, uint8_t address) {
         // Check for reset condition: key 401 pressed during startup window
     if (checkForReset && keyNumber == 401 && state == 1) {
       debugPrint("[NETWORK RESET]");
+      displayShowResetHeader();
+      delay(3000);
       resetNetworkDefaults();
       checkForReset = false;  // Prevent multiple resets
       return;  // Skip further processing of this event
