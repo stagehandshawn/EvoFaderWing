@@ -1,36 +1,8 @@
+// EvoFaderWing
 // Main.cpp
-/*
- * Enhanced Teensy 4.1 Motorized Fader Controller
- * PlatformIO Version - Modular Architecture
- * 
- * This is a comprehensive sketch that combines all functionality for controlling
- * motorized faders over Ethernet using OSC protocol.
- * 
- * Features:
- * - OSC communication over Ethernet using QNEthernet
- * - Web server for IP and OSC settings configuration
- * - Smooth motor control with feedback prevention
- * - Calibration routine for fader range mapping
- * - Motor deadzone compensation
- * - Velocity limiting for smooth movements
- * - Position smoothing with moving average filter
- * - OSC feedback prevention
- * - State machine for fader operation
- * - Configuration storage in EEPROM
- * - Touch sensor integration with MPR121
- * - NeoPixel color control with brightness fading
- * - Debugging options
- * 
- * File Structure:
- * - Config.h/cpp: Hardware configuration and global settings
- * - EEPROMStorage.h/cpp: Persistent storage management
- * - TouchSensor.h/cpp: MPR121 touch sensor handling
- * - NetworkOSC.h/cpp: Network setup and OSC communication
- * - FaderControl.h/cpp: Motor control and calibration
- * - NeoPixelControl.h/cpp: LED strip management
- * - WebServer.h/cpp: HTTP configuration interface
- * - Utils.h/cpp: Helper functions and utilities
- */
+
+// Teensy 4.1
+
 
 #include <Arduino.h>
 #include <QNEthernet.h>
