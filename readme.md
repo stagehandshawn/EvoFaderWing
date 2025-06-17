@@ -1,12 +1,14 @@
 EvoFaderWing - ShawnR - stagehandshawn@gmail.com
 
+OSC control of grandma3 faders with motorized feedback and backlit faders, 20 encoders and 40 standard exec buttons.
+
 This is a WIP but is fully functional, this is not a guide yet as i just do not have the time to make one but here is a limited BOM.
 
 any questions can be asked to me at stagehandshawn@gmail.com, ill help when I can.
 
 There are pinouts in the images, and/or docs folders, this with picture should give you an idea of how youll want to route wires.
 
-I have not coded in year and was never great at it so i leaned on ai to make this happen so the code could use some work i'm sure, lol
+I have not coded in years and was never great at it so i leaned on ai to make this happen so the code could use some work i'm sure, lol
 
 Image 00_connections give an idea of layout
 
@@ -34,6 +36,9 @@ Teensy 4.1 breakout board
 JST-XH connector kit
     https://www.amazon.com/dp/B09ZTWCZ3K?ref=ppx_yo2ov_dt_b_fed_asin_title
 
+Jst-XH connectors, hard to find larger sizes so i used these and took the wires out
+    https://www.amazon.com/dp/B0D3LW9B6J?ref=ppx_yo2ov_dt_b_fed_asin_title (wires removed)
+
 OLED 128x64
     https://www.amazon.com/dp/B09C5K91H7?ref=ppx_yo2ov_dt_b_fed_asin_title
 
@@ -42,7 +47,7 @@ Encoder knobs
 
 Power supply
     https://www.amazon.com/dp/B01D8FLXJU?ref=ppx_yo2ov_dt_b_fed_asin_title
-        1x Female DC barrel connector
+        1x Female DC barrel connector (don't use cheap plastic ones)
 
 LED diffusion
     https://www.amazon.com/dp/B07V3QJW1L?ref=ppx_yo2ov_dt_b_fed_asin_title
@@ -61,9 +66,6 @@ Touch sensor
 
 Motor Faders 5pk X2
     https://www.amazon.com/dp/B01DT827IC?ref=ppx_yo2ov_dt_b_fed_asin_title
-
-Jst-XH connectors, hard to find larger sizes so i used these and took the wires out
-    https://www.amazon.com/dp/B0D3LW9B6J?ref=ppx_yo2ov_dt_b_fed_asin_title (wires removed)
 
 Protoype boards
     https://www.amazon.com/dp/B07ZYNWJ1S?ref=ppx_yo2ov_dt_b_fed_asin_title
