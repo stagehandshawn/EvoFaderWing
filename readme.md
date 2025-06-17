@@ -31,6 +31,7 @@ More to come, thank you for checking out my project.
 You will find most of the BOM here, I will add more when I can, you are probably going to need a decent amount of electronic building gear already
 like soldering iron and solder, wires, and general know how of arduino type projects is a big help.
 
+NOTICE: If you enable serial debug you will notice jitter in the faders, serial debug MUST BE TURNED OFF WHEN NOT DEBUGGING
 
 Teensy 4.1 + eth kit
     https://www.amazon.com/dp/B08RSCFBNF?ref=ppx_yo2ov_dt_b_fed_asin_title
