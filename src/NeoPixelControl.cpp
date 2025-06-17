@@ -14,51 +14,6 @@ bool neoPixelDebug = false;
 
 Adafruit_NeoPixel pixels(NUM_PIXELS, NEOPIXEL_PIN, NEO_RGB + NEO_KHZ800);
 
-// // Converts RGB to HSV and scales value, then returns scaled RGB color
-// uint32_t getScaledColor(const Fader& fader) {
-//   float r = fader.red / 255.0f;
-//   float g = fader.green / 255.0f;
-//   float b = fader.blue / 255.0f;
-
-//   float cmax = std::max(r, std::max(g, b));
-//   float cmin = std::min(r, std::min(g, b));
-//   float delta = cmax - cmin;
-
-//   float h = 0, s = 0, v = cmax;
-
-//   if (delta != 0) {
-//     if (cmax == r) h = fmodf(((g - b) / delta), 6.0f);
-//     else if (cmax == g) h = ((b - r) / delta) + 2.0f;
-//     else h = ((r - g) / delta) + 4.0f;
-
-//     h *= 60.0f;
-//     if (h < 0) h += 360.0f;
-//   }
-
-//   if (cmax != 0) s = delta / cmax;
-
-//   float scaledV = fader.currentBrightness / 255.0f;
-
-//   float c = scaledV * s;
-//   float x = c * (1 - fabsf(fmodf(h / 60.0f, 2) - 1));
-//   float m = scaledV - c;
-
-//   float r1 = 0, g1 = 0, b1 = 0;
-
-//   if (h < 60)      { r1 = c; g1 = x; }
-//   else if (h < 120){ r1 = x; g1 = c; }
-//   else if (h < 180){ g1 = c; b1 = x; }
-//   else if (h < 240){ g1 = x; b1 = c; }
-//   else if (h < 300){ r1 = x; b1 = c; }
-//   else             { r1 = c; b1 = x; }
-
-//   return pixels.Color(
-//     (uint8_t)((r1 + m) * 255),
-//     (uint8_t)((g1 + m) * 255),
-//     (uint8_t)((b1 + m) * 255)
-//   );
-// }
-
 
 // Converts RGB to HSV and scales value, then returns scaled RGB color
 uint32_t getScaledColor(const Fader& fader) {
