@@ -10,7 +10,7 @@
 // GLOBAL NETWORK OBJECTS
 //================================
 
-// Add to TOP of src/NetworkOSC.cpp:
+
 EthernetUDP udp;
 
 
@@ -65,47 +65,6 @@ void restartUDP() {
 
 
 
-//================================
-// OSC MESSAGE HANDLING
-//================================
-
-// // Consolidated OSC message handler
-// void handleOscMessage() {
-//   int size = udp.parsePacket();
-//   if (size <= 0) return;
-
-//   const uint8_t *data = udp.data();
-//   LiteOSCParser parser;
-
-//   if (!parser.parse(data, size)) {
-//     debugPrint("Invalid OSC message.");
-//     return;
-//   }
-
-//   const char* addr = parser.getAddress();
-
-//   // Handle page update messages
-//   if (strstr(addr, "/updatePage/current") != NULL) {
-//     if (parser.getTag(0) == 'i') {
-//       handlePageUpdate(addr, parser.getInt(0));
-//     }
-//   }
-//   // Handle color messages
-//   else if (strstr(addr, "/Color") != NULL) {
-//     if (parser.getTag(0) == 's') {
-//       handleColorOsc(addr, parser.getString(0));
-//     }
-//   }
-//   // Handle fader movement messages
-//   else if (strstr(addr, "/Page") != NULL && strstr(addr, "/Fader") != NULL) {
-//     if (parser.getTag(0) == 'i') {
-//       int value = parser.getInt(0);
-      
-//       handleOscMovement(addr, value);
-
-//     }
-//   }
-// }
 
 // Returns the index of the fader with the given OSC ID, or -1 if not found
 int getFaderIndexFromID(int id) {
@@ -158,10 +117,7 @@ void handlePageUpdate(const char *address, int value) {
 
 void sendOscUpdate(Fader& f, int value, bool force) {
   unsigned long now = millis();
-//Do not send osc of fader is not touched
-  // if (!f.touched){
-  //   return;
-  // }
+
 
   // Only send if value changed significantly or enough time passed or force flag is set
   if (force || (abs(value - f.lastSentOscValue) >= Fconfig.sendTolerance && 
@@ -173,8 +129,7 @@ void sendOscUpdate(Fader& f, int value, bool force) {
 
     debugPrintf("Sending OSC update for Fader %d on Page %d → value: %d\n", f.oscID, currentOSCPage, value);
     
-    // Create OSC message - This is a simplified placeholder
-    // OSC message format: [address]\0,[tags]\0,data...
+  
     
     uint8_t buffer[64];
     int size = 0;
@@ -279,7 +234,7 @@ void parseDualColorValues(const char *colorString, Fader& f) {
     }
   }
   
-  // NEW: Logic to choose between primary and secondary color
+  // Logic to choose between primary and secondary color
   if (primaryRed == 0 && primaryGreen == 0 && primaryBlue == 0) {
     // Primary is all zeros (black/off), use secondary color
     f.red = secondaryRed;
@@ -397,7 +352,6 @@ void sendOscMessage(const char* address, const char* typeTag, const void* value)
 
 
 
-// Add this function to your NetworkOSC.cpp file
 
 // Handle bundled fader update messages
 void handleBundledFaderUpdate(LiteOSCParser& parser) {
@@ -489,7 +443,8 @@ void handleBundledFaderUpdate(LiteOSCParser& parser) {
   debugPrint("Bundled fader update complete");
 }
 
-// Modified handleOscMessage function - replace your existing one  WE WILL BE FIXING AND OR REPLACEING THIS NOW WE Use A BUNDLE
+// Handle osc messages comming in
+
 void handleOscMessage() {
   int size = udp.parsePacket();
   if (size <= 0) return;
