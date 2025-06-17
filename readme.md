@@ -1,5 +1,7 @@
 EvoFaderWing - ShawnR - stagehandshawn@gmail.com
 
+![FaderWing Image](docs/images/faderwing.jpg)
+
 OSC control of grandma3 faders with motorized feedback and backlit faders, 20 encoders and 40 standard exec buttons.
 
 This is a WIP but is fully functional, this is not a guide yet as i just do not have the time to make one but here is a limited BOM.
