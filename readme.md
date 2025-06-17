@@ -105,7 +105,6 @@ Wire
     M3 screws 8 to 12mm, flat or buttonhead
     M3 heatset inserts    
 
-When i have time i will mod the channel to be larger as i did not make it large enough on the first print but made it work.
 
 
 Filiment i used
