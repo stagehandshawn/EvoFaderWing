@@ -784,7 +784,7 @@ void sendCommonStyles() {
 // Helper function to send navigation header
 void sendNavigationHeader(const char* pageTitle) {
   client.println("<div class='header'>");
-  client.println("<h1>GMA3 FaderWing Configuration</h1>");
+  client.println("<h1>EvoFaderWing Configuration</h1>");
   client.print("<p>IP: ");
   client.print(ipToString(Ethernet.localIP()));
   client.println("</p>");
