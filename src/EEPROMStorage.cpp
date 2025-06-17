@@ -34,7 +34,6 @@ void checkCalibration() {
   if (EEPROM.read(EEPROM_CAL_SIGNATURE_ADDR) != CALCFG_EEPROM_SIGNATURE) {
     debugPrint("Running calibration...");
     calibrateFaders();
-    //manualTouchCalibration();   // Also recalibrate touch sensor
 
     saveCalibration();
     saveTouchConfig();          // Save default touch configuration as well
@@ -121,7 +120,6 @@ void saveNetworkConfig() {
     if (oldConfig.subnet[i] != netConfig.subnet[i]) configChanged = true;
   }
   if (oldConfig.useDHCP != netConfig.useDHCP) configChanged = true;
-  //if (oldConfig.receivePort != netConfig.receivePort || oldConfig.sendPort != netConfig.sendPort) configChanged = true;
 
   if (configChanged) {
     Ethernet.end();

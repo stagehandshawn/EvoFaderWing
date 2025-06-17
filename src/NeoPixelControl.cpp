@@ -110,9 +110,6 @@ void updateNeoPixels() {
 
     uint32_t color = getScaledColor(f);
 
-    // Only output debug when brightness changes
-    // (keep debug output logic unchanged; r/g/b vars not available here, but can be restored if needed)
-    // If you want to keep reporting scaled RGB, you could recompute them here, or adapt as needed.
     if (neoPixelDebug && f.currentBrightness != f.lastReportedBrightness) {
       uint8_t r = (f.red * f.currentBrightness) / 255;
       uint8_t g = (f.green * f.currentBrightness) / 255;

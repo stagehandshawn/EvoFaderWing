@@ -39,7 +39,6 @@ void driveMotor(Fader& f, int direction) {
 }
 
 
-// Add this new function that accepts custom PWM
 void driveMotorWithPWM(Fader& f, int direction, int pwmValue) {
   if (direction == 0) {
     // Stop the motor
@@ -69,7 +68,6 @@ void driveMotorWithPWM(Fader& f, int direction, int pwmValue) {
   }
 }
 
-// Add this function to calculate PWM based on distance to target
 int calculateVelocityPWM(int difference) {
   int absDifference = abs(difference);
   
@@ -99,22 +97,10 @@ int calculateVelocityPWM(int difference) {
   return pwmValue;
 }
 
-//================================
-// MAIN FADER PROCESSING
-//================================
-
-
-
 
 //================================
-// MOVE FADER TO SETPOINT
+// MOVE ALL FADERs TO SETPOINT
 //================================
-
-
-
-/// Function to move all faders to their setpoints
-// This function will be called when OSC messages are received
-
 
 void moveAllFadersToSetpoints() {
   bool allFadersAtTarget = false;
@@ -140,14 +126,6 @@ void moveAllFadersToSetpoints() {
       if (abs(difference) > Fconfig.targetTolerance && !f.touched) {
         allFadersAtTarget = false; // At least one fader is not at target
         
-        // Determine direction and move
-        // if (difference > 0) {
-        //   // Need to move up
-        //   driveMotor(f, 1);
-        // } else {
-        //   // Need to move down
-        //   driveMotor(f, -1);
-        // }
         
 
         if (difference > 0) {
@@ -172,21 +150,13 @@ void moveAllFadersToSetpoints() {
           driveMotorWithPWM(f, 0, 0);
         }
 
-      // } else {
-      //   // Fader is at target, stop motor
-      //   driveMotor(f, 0);
-      //   f.state = FADER_IDLE;
-      // }
     }
     
     // Small delay to prevent overwhelming the system
     delay(5);
-
-    // here we will check for more osc but will block all other functions, so we can get al osc moves
-    //handleOscMessage();
     
     // Optional: Add timeout protection to prevent infinite loops
-    if (millis() - moveStartTime > 10000) { // 10 second timeout
+    if (millis() - moveStartTime > 2000) { // 10 second timeout
       // Stop all motors if we've been trying for too long
       for (int i = 0; i < NUM_FADERS; i++) {
         driveMotor(faders[i], 0);
@@ -217,13 +187,12 @@ void setFaderSetpoint(int faderIndex, int oscValue) {
 }
 
 
-///////////////////////////
 
 void handleFaders() {
   for (int i = 0; i < NUM_FADERS; i++) {
     Fader& f = faders[i];
 
-    if (!f.touched){    // FOR NOW WE HAVE TO KEEP THIS NOT SURE HOW TO FIX THE FEEDBACK WITHOUT IT YET!!
+    if (!f.touched){    
       continue;
     }
 

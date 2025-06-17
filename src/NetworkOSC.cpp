@@ -102,7 +102,7 @@ void handleOscMovement(const char *address, int value) {
 }
 
 
-// New function to handle page update messages
+// function to handle page update messages
 void handlePageUpdate(const char *address, int value) {
   if (strstr(address, "/updatePage/current") != NULL) {
     if (value != currentOSCPage) {
@@ -111,7 +111,6 @@ void handlePageUpdate(const char *address, int value) {
     currentOSCPage = value;
   }
 }
-
 
 // Fader updates
 
@@ -395,12 +394,12 @@ void handleBundledFaderUpdate(LiteOSCParser& parser) {
     if (faderIndex >= 0 && faderIndex < NUM_FADERS) {
       // Only update if fader is not currently being touched (avoid feedback)
       if (!faders[faderIndex].touched) {
+        
         // Check if the value actually changed before updating
-        //int currentSetpoint = faders[faderIndex].setpoint;
         int currentOscvalue = readFadertoOSC(faders[faderIndex]);
         
         // Convert OSC value (0-100) to fader range if needed
-        // (You may need to adjust this based on how your setFaderSetpoint works)
+
         if (abs(oscValue - currentOscvalue) > Fconfig.targetTolerance) {
           debugPrintf("Updating fader %d setpoint: %d -> %d\n", faderOscID, currentOscvalue, oscValue);
           setFaderSetpoint(faderIndex, oscValue);

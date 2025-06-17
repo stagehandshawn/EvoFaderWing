@@ -144,7 +144,7 @@ void pollSlave(uint8_t address, int slaveIndex) {
   while (Wire.available()) Wire.read();
 }
 
-// === SIMPLIFIED ENCODER PROCESSING ===
+// === ENCODER PROCESSING ===
 void processEncoderData(uint8_t count, uint8_t address) {
   if (count == 0) return;
   
@@ -178,7 +178,7 @@ void processEncoderData(uint8_t count, uint8_t address) {
   }
 }
 
-// === SIMPLIFIED KEYPRESS PROCESSING ===
+// === KEYPRESS PROCESSING ===
 void processKeypressData(uint8_t count, uint8_t address) {
   if (count == 0) return;
   

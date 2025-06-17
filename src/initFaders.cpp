@@ -24,7 +24,7 @@ void initializeFaders() {
     faders[i].current = 0;
     faders[i].motorOutput = 0;
     faders[i].lastMotorOutput = 0;
-    faders[i].lastReportedValue = -1;  //remove for testing and to make it more simple already getting average readings
+    faders[i].lastReportedValue = -1;
     faders[i].lastMoveTime = 0;
     faders[i].lastOscSendTime = 0;
     faders[i].suppressOSCOut = false;

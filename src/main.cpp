@@ -27,8 +27,8 @@ void updateBrightnessOnFaderTouchChange();
 
 unsigned long lastI2CPollTime = 0;     // Time of last I2C poll cycle
 
-OLED display;             // <-- define display here
-IPAddress currentIP;      // <-- define currentIP
+OLED display;             // define display 
+IPAddress currentIP;      // define currentIP
 
 //================================
 // MAIN ARDUINO FUNCTIONS
@@ -59,7 +59,6 @@ void setup() {
   moveAllFadersToSetpoints();
 
   //Setup I2C Slaves so we can also check for network reset
-  //setupI2cPolling();
   setupI2cPolling();
   
   // Setup OLED before network to watch for no dhcp server and know were booting
@@ -68,9 +67,7 @@ void setup() {
   // Set up network connection
   setupNetwork();
 
-
-
-   displayIPAddress();
+  displayIPAddress();
 
   // Start web server for configuration
   startWebServer();
@@ -97,14 +94,11 @@ void loop() {
 // Process OSC messages
   handleOscMessage();
 
-
   // Check for manual fader movement
   handleFaders();
 
-
-
   // Handle I2C Polling for encoders keypresses and encoder key press
-    handleI2c();
+  handleI2c();
 
     
   // Process touch changes - this function already checks the flag internally
@@ -126,10 +120,8 @@ void loop() {
     // Update NeoPixels
   updateNeoPixels();
 
-
-  // If in debug mode will check for a serial request to reboot into bootloader mode for auto upload without pressing button
   
-    checkSerialForReboot();
+  checkSerialForReboot();
 
   yield(); // Let the Teensy do background tasks
 }
