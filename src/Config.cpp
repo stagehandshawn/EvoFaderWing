@@ -19,6 +19,7 @@ const uint8_t PWM_PINS[NUM_FADERS] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 
 //USE 12 for NEOPIXEL
 //USE 13 for MRP121
+//USE 18 (SDA), 19(SCL) for I2C
 
 // Motor direction control pins — each fader has two pins for H-bridge control.
 const uint8_t DIR_PINS1[NUM_FADERS] = {26, 28, 30, 32, 34, 36, 38, 40, 10, 51};
