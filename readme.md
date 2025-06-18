@@ -17,7 +17,7 @@ OSC control of grandMA3 faders with motorized feedback and backlit faders, 20 en
 
 [Bill Of Materials](https://github.com/stagehandshawn/EvoFaderWing/wiki/Bill-of-materials)
 
-I have also created a [Wiki](https://github.com/stagehandshawn/EvoFaderWing/wiki) that I will be working on.
+[Wiring Diagrams](https://github.com/stagehandshawn/EvoFaderWing/wiki/Wiring-Diagrams)
 
 Any questions can be sent to me at [stagehandshawn@gmail.com](mailto:stagehandshawn@gmail.com). I'll help when I can.
 
