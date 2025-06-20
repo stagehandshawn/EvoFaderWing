@@ -10,9 +10,7 @@
 // GLOBAL NETWORK OBJECTS
 //================================
 
-
 EthernetUDP udp;
-
 
 //================================
 // NETWORK SETUP
@@ -65,7 +63,6 @@ void restartUDP() {
 
 
 
-
 // Returns the index of the fader with the given OSC ID, or -1 if not found
 int getFaderIndexFromID(int id) {
   for (int i = 0; i < NUM_FADERS; i++) {
@@ -76,7 +73,7 @@ int getFaderIndexFromID(int id) {
   return -1;
 }
 
-// Handles fader movement OSC messages
+// Handles fader movement OSC messages                      This function is deprecated we use bundled messages now but it is here for testing
 void handleOscMovement(const char *address, int value) {
   int pageNum = -1;
   int faderID = -1;
@@ -96,6 +93,7 @@ void handleOscMovement(const char *address, int value) {
 
             // When you receive an OSC message:
             debugPrintf("Fader %d new setpoint %d (via fader message)\n", faderID, value);
+
       setFaderSetpoint(faderIndex, value); // oscValue is 0-100
       moveAllFadersToSetpoints(); // This will move all faders as needed
   }
@@ -188,6 +186,9 @@ void handleColorOsc(const char *address, const char *colorString) {
 //================================
 // OSC UTILITY FUNCTIONS
 //================================
+
+//We are sending 2 colors per fader, color data for exec 101-110 and 201-210 so if we assign a fader to 101 we will stil get correct fader color
+
 void parseDualColorValues(const char *colorString, Fader& f) {
   char buffer[128];  // Increased buffer size for 8 color values
   strncpy(buffer, colorString, 127);

@@ -138,8 +138,6 @@ void moveAllFadersToSetpoints() {
           driveMotorWithPWM(f, -1, pwm);
         }
 
-
-
         if (debugMode) {
           debugPrintf("Fader %d: Current OSC: %d, Target OSC: %d, Diff: %d\n", 
                      f.oscID, currentOscValue, targetOscValue, difference);
@@ -156,7 +154,7 @@ void moveAllFadersToSetpoints() {
     delay(5);
     
     // Optional: Add timeout protection to prevent infinite loops
-    if (millis() - moveStartTime > 2000) { // 10 second timeout
+    if (millis() - moveStartTime > 2000) { // 5 second timeout
       // Stop all motors if we've been trying for too long
       for (int i = 0; i < NUM_FADERS; i++) {
         driveMotor(faders[i], 0);
@@ -212,8 +210,7 @@ void handleFaders() {
         } else {
           sendOscUpdate(f, currentOscValue, false);
         }
-
-
+        
         f.setpoint = currentOscValue;
 
         if (debugMode) {

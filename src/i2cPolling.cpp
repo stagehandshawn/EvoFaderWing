@@ -34,12 +34,12 @@ const int numSlaves = sizeof(slaveAddresses) / sizeof(slaveAddresses[0]);
 #define DATA_TYPE_ENCODER  0x01  // Data type identifier for encoder rotation messages
 #define DATA_TYPE_KEYPRESS 0x02  // Data type identifier for keypress/release messages
 
-// === Simplified Timing Variables (separate from original) ===
+// === Timing Variables ===
 unsigned long lastPollTimeSimple = 0;          
 const unsigned long I2C_POLL_INTERVAL_SIMPLE = 10;    // Poll every 10ms instead of 1ms
 
-// === SIMPLIFIED SETUP FUNCTION ===
-// Call this INSTEAD of setupI2cPolling() in your main setup()
+// === SETUP FUNCTION ===
+
 void setupI2cPolling() {
   Wire.begin();                
   Wire.setClock(400000);       // 400kHz
@@ -58,8 +58,8 @@ void setupI2cPolling() {
   debugPrint("[I2C] Ready for polling");
 }
 
-// === SIMPLIFIED MAIN POLLING FUNCTION ===
-// Call this INSTEAD of handleI2c() in your main loop()
+// === MAIN POLLING FUNCTION ===
+
 void handleI2c() { 
   unsigned long currentTime = millis();  
   
@@ -74,7 +74,7 @@ void handleI2c() {
   }
 }
 
-// === SIMPLIFIED SLAVE POLLING ===
+// === SLAVE POLLING ===
 void pollSlave(uint8_t address, int slaveIndex) {
   // Clear any leftover data first
   while (Wire.available()) Wire.read();
@@ -257,29 +257,6 @@ void sendEncoderOSC(int encoderNumber, bool isPositive, int velocity) {
 }
 
 
-
-// === PERFORMANCE MEASUREMENT FUNCTION ===
-// Alternative polling function that measures the time taken to poll all slaves
-// Useful for performance tuning and verifying that polling stays within timing budget
-void measurePollingSpeed() {
-  unsigned long startTime = micros();  // Get high-precision start timestamp
-  
-  // Poll all slaves once, just like the normal polling cycle
-  for (int i = 0; i < numSlaves; i++) {
-    pollSlave(slaveAddresses[i], i);
-  }
-  
-  unsigned long endTime = micros();    // Get high-precision end timestamp
-  unsigned long totalTime = endTime - startTime;  // Calculate elapsed time
-  
-  // Output timing information for performance analysis using project's debug system
-  debugPrintf("[TIMING] Polled %d slaves in %lu microseconds", numSlaves, totalTime);
-  
-  // Note: With 5 slaves at 400kHz I2C, total time should be around 2000-3000 microseconds
-  // This leaves plenty of time in each 1ms polling cycle for other system operations
-}
-
-
 void sendKeyOSC(uint16_t keyNumber, uint8_t state) {
   // Validate key number is in expected ranges
   if (!((keyNumber >= 101 && keyNumber <= 110) ||
@@ -309,4 +286,29 @@ void sendKeyOSC(uint16_t keyNumber, uint8_t state) {
   // Debug output
   debugPrintf("[OSC] Sent: %s %d (key %d %s)", 
              oscAddress, keyState, keyNumber, state ? "PRESSED" : "RELEASED");
+}
+
+
+
+
+
+// === PERFORMANCE MEASUREMENT FUNCTION ===
+// Alternative polling function that measures the time taken to poll all slaves
+// Useful for performance tuning and verifying that polling stays within timing budget
+void measurePollingSpeed() {
+  unsigned long startTime = micros();  // Get high-precision start timestamp
+  
+  // Poll all slaves once, just like the normal polling cycle
+  for (int i = 0; i < numSlaves; i++) {
+    pollSlave(slaveAddresses[i], i);
+  }
+  
+  unsigned long endTime = micros();    // Get high-precision end timestamp
+  unsigned long totalTime = endTime - startTime;  // Calculate elapsed time
+  
+  // Output timing information for performance analysis using project's debug system
+  debugPrintf("[TIMING] Polled %d slaves in %lu microseconds", numSlaves, totalTime);
+  
+  // Note: With 5 slaves at 400kHz I2C, total time should be around 2000-3000 microseconds
+  // This leaves plenty of time in each 1ms polling cycle for other system operations
 }

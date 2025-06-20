@@ -138,7 +138,7 @@ void calibrateFaders() {
     bool minCalibrationSuccess = false;
     
     while (plateau < PLATEAU_COUNT) {
-      // Check for timeout (10 seconds)
+      // Check for timeout 
       if ((millis() - startTime) > calibrationTimeout) {
         debugPrintf("ERROR: Fader %d MIN calibration timed out! Using default value of 0.\n", i);
         f.minVal = 20;  // Use default min value

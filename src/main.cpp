@@ -104,7 +104,7 @@ void loop() {
   // Process touch changes - this function already checks the flag internally
   if (processTouchChanges()) {
     updateBrightnessOnFaderTouchChange();
-    printFaderTouchStates();
+    printFaderTouchStates();                //verbose debug output
   }
 
   // Check for web requests
@@ -126,6 +126,9 @@ void loop() {
   yield(); // Let the Teensy do background tasks
 }
 
+
+// #### oled display functions ####
+
 void displayIPAddress(){
 
   display.clear();
@@ -136,6 +139,5 @@ void displayIPAddress(){
 }
 
 void displayShowResetHeader(){
-
   display.showHeader("Network Reset");
 }

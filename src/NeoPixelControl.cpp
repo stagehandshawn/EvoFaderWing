@@ -30,7 +30,7 @@ uint32_t getScaledColor(const Fader& fader) {
   float cmin = std::min(r, std::min(g, b));
   float delta = cmax - cmin;
 
-  float h = 0, s = 0, v = cmax;
+  float h = 0, s = 0;//, v = cmax;  //we are not using value in HSV, we are using fader.currentBrightness as v
 
   if (delta != 0) {
     if (cmax == r) h = fmodf(((g - b) / delta), 6.0f);
