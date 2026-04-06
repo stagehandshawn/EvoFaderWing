@@ -1,7 +1,7 @@
 // === OLED.h ===
 // Simple OLED wrapper using Adafruit SSD1306 library
 // Designed for Teensy 4.1 fader wing project
-// Provides easy variable display functions for your 128x64 SSD1306 display
+// Provides helper functions for a 128x64 SSD1306 display
 
 #ifndef OLED_H
 #define OLED_H
@@ -11,7 +11,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <IPAddress.h>
-#include <memory>  // Added for std::unique_ptr
+#include <memory>
 
 // === OLED Configuration Constants ===
 #define SCREEN_WIDTH 128        // OLED display width in pixels
@@ -29,6 +29,16 @@
 #define MAX_LINES_SMALL 8       // Maximum lines with small text
 #define MAX_LINES_MEDIUM 4      // Maximum lines with medium text
 
+enum class OLEDNetworkState : uint8_t {
+    LinkDown = 0,
+    ConnectingLink,
+    ConnectingDhcp,
+    ConnectingStatic,
+    ConnectedDhcp,
+    ConnectedStatic,
+    DhcpStaticFallback
+};
+
 // === OLED Wrapper Class ===
 class OLED {
 private:
@@ -38,7 +48,6 @@ private:
     
     // === Private Helper Functions ===
     bool testAddress(uint8_t address);     // Test if display responds at address
-    bool initializeDisplay();              // Initialize display with SSD1306 sequence
     void clearLine(uint8_t line, uint8_t textSize = TEXT_SIZE_SMALL); // Clear specific line
     
 public:
@@ -82,8 +91,8 @@ public:
     void showStatus(const char* status);   // Display status on last line
     void showTime(unsigned long millis);   // Display uptime/runtime
 
-//    void OLED::showIPAddress(IPAddress ip, uint16_t recvPort, IPAddress sendIP, uint16_t sendPort);
-    void showIPAddress(IPAddress ip, uint16_t recvPort, IPAddress sendIP, uint16_t sendPort);
+    void showIPAddress(IPAddress ip, uint16_t oscPort, IPAddress sendIP);
+    void showNetworkStatus(OLEDNetworkState state, IPAddress ip, uint16_t oscPort, IPAddress sendIP);
 
     // === Public Advanced Functions ===
     void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1); // Draw line
@@ -100,11 +109,6 @@ public:
     void addDebugLine(const char* text);
     void clearDebugLines();
 };
-
-// === External Debug Functions  ===
-extern void debugPrint(const char* message);
-extern void debugPrintf(const char* format, ...);
-
 extern OLED display;
 
 #endif // OLED_H

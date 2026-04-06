@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GMA3 DataVersion="1.9.7.0">
+    <UserPlugin Name="EvoFaderWing" Author="ShawnR" Version="0.4" Path="/EvoFaderWing">
+        <ComponentLua Name="Main" Filename="EvoFaderWing0.4.lua"/>
+    </UserPlugin>
+</GMA3>

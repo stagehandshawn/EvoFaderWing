@@ -8,7 +8,6 @@
 // COMMON GLOBALS
 //================================
 
-bool touchDebug = true;
 unsigned long touchDebugIntervalMs = 500;  // Minimum time between debug prints
 bool irqDebugOnly = true;  // When true, only print touch debug on IRQ-triggered reads
 unsigned long lastTouchDebugTime = 0;
@@ -75,7 +74,7 @@ static bool releaseDebounceActive[NUM_FADERS] = {false};
 // Helper to dump current MTCH2120 configuration snapshot for debugging.
 static void dumpSensorConfigSnapshot() {
   if (!touchSensor.communicating()) {
-    debugPrint("MTCH2120 not responding");
+    TOUCH_ERROR_PRINT("MTCH2120 not responding");
     return;
   }
 
@@ -89,31 +88,31 @@ static void dumpSensorConfigSnapshot() {
 
   uint16_t devCtrl = 0;
   if (touchSensor.readDeviceControl(devCtrl)) {
-    debugPrintf("DevCtrl=0x%04X AT=%d ET=%d SAVE=%d FREQHOP=%d",
-                devCtrl,
-                (devCtrl & MTCH2120::DEVCTRL_AT) ? 1 : 0,
-                (devCtrl & MTCH2120::DEVCTRL_ET) ? 1 : 0,
-                (devCtrl & MTCH2120::DEVCTRL_SAVE) ? 1 : 0,
-                (devCtrl & MTCH2120::DEVCTRL_FREQHOP) ? 1 : 0);
+    TOUCH_RAW_DEBUG_PRINTF("DevCtrl=0x%04X AT=%d ET=%d SAVE=%d FREQHOP=%d",
+                           devCtrl,
+                           (devCtrl & MTCH2120::DEVCTRL_AT) ? 1 : 0,
+                           (devCtrl & MTCH2120::DEVCTRL_ET) ? 1 : 0,
+                           (devCtrl & MTCH2120::DEVCTRL_SAVE) ? 1 : 0,
+                           (devCtrl & MTCH2120::DEVCTRL_FREQHOP) ? 1 : 0);
   }
 
   MTCH2120::GroupConfig cfg{};
   if (touchSensor.readGroupConfig(cfg)) {
-    debugPrintf("TouchPeriod=%u LowPowerPeriod=%u DI=%u ATint=%u MaxOn=%u DHT=%u TDrift=%u ATDrift=%u ATR=%u NoiseThr=%u NoiseInt=%u Hop=%u,%u,%u",
-                cfg.touchMeasurementPeriod,
-                cfg.lowPowerMeasurementPeriod,
-                cfg.detectIntegration,
-                cfg.sensorAntiTouchIntegration,
-                cfg.sensorMaxOnTime,
-                cfg.sensorDriftHoldTime,
-                cfg.sensorTouchDriftRate,
-                cfg.sensorAntiTouchDriftRate,
-                cfg.sensorAntiTouchRecalThr,
-                cfg.noiseThreshold,
-                cfg.noiseIntegration,
-                cfg.hopFrequency[0],
-                cfg.hopFrequency[1],
-                cfg.hopFrequency[2]);
+    TOUCH_RAW_DEBUG_PRINTF("TouchPeriod=%u LowPowerPeriod=%u DI=%u ATint=%u MaxOn=%u DHT=%u TDrift=%u ATDrift=%u ATR=%u NoiseThr=%u NoiseInt=%u Hop=%u,%u,%u",
+                           cfg.touchMeasurementPeriod,
+                           cfg.lowPowerMeasurementPeriod,
+                           cfg.detectIntegration,
+                           cfg.sensorAntiTouchIntegration,
+                           cfg.sensorMaxOnTime,
+                           cfg.sensorDriftHoldTime,
+                           cfg.sensorTouchDriftRate,
+                           cfg.sensorAntiTouchDriftRate,
+                           cfg.sensorAntiTouchRecalThr,
+                           cfg.noiseThreshold,
+                           cfg.noiseIntegration,
+                           cfg.hopFrequency[0],
+                           cfg.hopFrequency[1],
+                           cfg.hopFrequency[2]);
   }
 }
 
@@ -210,7 +209,7 @@ bool setupTouch() {
 }
 
 static void printFaderTouchStatesInternal(unsigned long now, bool wasIrq) {
-  if (!touchDebug) {
+  if (!debugEnabled(DBG_CH_TOUCH_RAW, DBG_DEBUG)) {
     return;
   }
 
@@ -221,22 +220,22 @@ static void printFaderTouchStatesInternal(unsigned long now, bool wasIrq) {
   }
 
   lastTouchDebugTime = now;
-  debugPrint("Raw Touch Values:");
+  TOUCH_RAW_DEBUG_PRINT("Raw Touch Values:");
   for (int j = 0; j < NUM_FADERS; j++) {
     MTCH2120::RawKeyData data{};
     if (touchSensor.readRawKey(j, data)) {
       int32_t delta = static_cast<int32_t>(data.reference) - static_cast<int32_t>(data.signal);
       const bool touched = touchConfirmed[j];
       const unsigned long duration = touched ? faders[j].touchDuration : 0;
-      debugPrintf("F%d - %s - %lums - Base: %u - Signal: %u - Delta: %ld",
-                  j,
-                  touched ? "TOUCHED" : "NOTOUCH",
-                  duration,
-                  data.reference,
-                  data.signal,
-                  delta);
+      TOUCH_RAW_DEBUG_PRINTF("F%d - %s - %lums - Base: %u - Signal: %u - Delta: %ld",
+                             j,
+                             touched ? "TOUCHED" : "NOTOUCH",
+                             duration,
+                             data.reference,
+                             data.signal,
+                             delta);
     } else {
-      debugPrintf("Fader %d - read error", j);
+      TOUCH_ERROR_PRINTF("Fader %d - read error", j);
     }
   }
   dumpSensorConfigSnapshot();
@@ -501,17 +500,17 @@ bool processTouchChanges() {
   uint16_t currentTouches = mpr121.touched();
   bool stateUpdated = false;
 
-  if (touchDebug) {
+  if (debugEnabled(DBG_CH_TOUCH_RAW, DBG_DEBUG)) {
     const bool intervalHit = (now - lastTouchDebugTime >= touchDebugIntervalMs);
     const bool shouldDebug = (wasIrq || intervalHit) && (!irqDebugOnly || wasIrq);
     if (shouldDebug) {
       lastTouchDebugTime = now;
-      debugPrint("Raw Touch Values:");
+      TOUCH_RAW_DEBUG_PRINT("Raw Touch Values:");
       for (int j = 0; j < NUM_FADERS; j++) {
         uint16_t baseline = mpr121.baselineData(j);
         uint16_t filtered = mpr121.filteredData(j);
         int16_t delta = baseline - filtered;
-        debugPrintf("Fader %d - Base: %u, Filtered: %u, Delta: %d", j, baseline, filtered, delta);
+        TOUCH_RAW_DEBUG_PRINTF("Fader %d - Base: %u, Filtered: %u, Delta: %d", j, baseline, filtered, delta);
       }
     }
   }
@@ -658,15 +657,15 @@ void clearTouchError() {
 //================================
 
 void printFaderTouchStates() {
-  if (!touchDebug){
+  if (!debugEnabled(DBG_CH_TOUCH_CORE, DBG_DEBUG)) {
     return;
   }
-  debugPrint("Fader Touch States:");
+  TOUCH_DEBUG_PRINT("Fader Touch States:");
   for (int i = 0; i < NUM_FADERS; i++) {
     if (faders[i].touched) {
-      debugPrintf("  Fader %d: TOUCHED (%lums)", i, faders[i].touchDuration);
+      TOUCH_DEBUG_PRINTF("  Fader %d: TOUCHED (%lums)", i, faders[i].touchDuration);
     } else {
-      debugPrintf("  Fader %d: released", i);
+      TOUCH_DEBUG_PRINTF("  Fader %d: released", i);
     }
   }
 }

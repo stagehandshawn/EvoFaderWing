@@ -9,7 +9,36 @@
 // IDENTITY
 //================================
 #define PROJECT_NAME "EvoFaderWing"
-#define SW_VERSION      "0.3.1"
+#define SW_VERSION      "0.4"
+
+//================================
+// DEBUG CHANNELS
+//================================
+enum DebugLevel : uint8_t {
+  DBG_OFF = 0,
+  DBG_ERROR = 1,
+  DBG_DEBUG = 2
+};
+
+enum DebugChannel : uint8_t {
+  DBG_CH_SYSTEM = 0,
+  DBG_CH_WEB,
+  DBG_CH_NETWORK,
+  DBG_CH_OSC,
+  DBG_CH_I2C_BUS,
+  DBG_CH_FADER_CORE,
+  DBG_CH_FADER_POSITION,
+  DBG_CH_TOUCH_CORE,
+  DBG_CH_TOUCH_RAW,
+  DBG_CH_CALIBRATION,
+  DBG_CH_EEPROM,
+  DBG_CH_LED_EXEC,
+  DBG_CH_OLED,
+  DBG_CH_COUNT
+};
+
+static const uint8_t DEBUG_CHANNEL_COUNT = (uint8_t)DBG_CH_COUNT;
+static const uint8_t DEBUG_CONFIG_VERSION = 2;
 
 //================================
 // HARDWARE CONFIGURATION
@@ -19,7 +48,7 @@
 #define NUM_FADERS      10       // Total number of motorized faders
 #define SERIAL_BAUD     115200   // Baud rate for USB serial output/debug
 
-// Motor control settings THE PWM DEFAULTS ARE SET FOR A 12V PSU, is you use the correct 10v psu you will need to adjust them
+// Motor control defaults tuned for a 12V PSU; adjust if the hardware uses a lower supply voltage.
 #define MAX_PWM        150      // Default motor speed (PWM duty cycle) during normal operation (0–255) BEST at 100-150
 #define CALIB_PWM       80       // Reduced motor speed during auto-calibration phase
 #define MIN_PWM         40       // Minimum PWM to overcome motor inertia 
@@ -112,8 +141,7 @@ struct NetworkConfig {
   IPAddress gateway;      // Default network gateway
   IPAddress subnet;       // Subnet mask
   IPAddress sendToIP;     // OSC destination IP address
-  uint16_t  receivePort;  // OSC listening port (e.g. 8000)
-  uint16_t  sendPort;     // OSC destination port (e.g. 9000)
+  uint16_t  oscPort;      // Shared OSC send/receive port (e.g. 8000)
   bool      useDHCP;      // If true, use DHCP instead of static IP
 };
 
@@ -136,6 +164,9 @@ struct FaderConfig {
   bool serialDebug;
   bool sendKeystrokes;       // Send keystroke using usb rather than osc for exec keys, this gives more native support (can store using exec key directly)
   bool useLevelPixels;       // When true, render per-fader level bars instead of full fill
+  bool allowFaderOscWithoutTouch;  // Allow local/manual fader OSC send even without touch detect
+  uint8_t debugConfigVersion;       // Version tag for persisted debug channel layout
+  uint8_t debugLevel[DEBUG_CHANNEL_COUNT];  // Per-channel debug verbosity
 };
 
 // Executor LED configuration
@@ -181,6 +212,10 @@ struct Fader {
 
   uint16_t oscID;           // OSC ID like 201 for /Page2/Fader201
   int lastAnalogValue;      // Last raw analog reading to suppress small jitter
+  int lastSampledOscValue;  // Last sampled OSC value used for local-manual movement detection
+  bool manualOverride;      // Local/manual movement currently owns this fader
+  unsigned long manualLastMoveTime; // Last time local/manual movement was detected
+  unsigned long remoteControlLockoutUntil; // Prevent motor-driven movement from being treated as manual right after OSC input
 
 
   // Color variables
@@ -235,5 +270,8 @@ void displayShowResetHeader();
 
 // Debug setting
 extern bool debugMode;
+
+void loadDefaultDebugLevels(uint8_t* levels, size_t count);
+const char* debugChannelName(DebugChannel channel);
 
 #endif // CONFIG_H

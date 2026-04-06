@@ -22,9 +22,10 @@ extern AsyncUDP oscUdp;
 // FUNCTION DECLARATIONS
 //================================
 
-// Network setup and management
-void setupNetwork();
-void restartUDP();
+// Network transport services (owned by NetworkManager)
+void startNetworkServices();
+void stopNetworkServices();
+void restartNetworkServices();
 void processOscQueue();  // Process queued OSC packets (call from loop)
 
 

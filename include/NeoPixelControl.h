@@ -20,6 +20,7 @@ extern Adafruit_NeoPixel pixels;
 void setupNeoPixels();
 void updateNeoPixels();
 void updateBaseBrightnessPixels();
+void invalidateNeoPixelRenderCache();
 
 void updateBrightnessOnFaderTouchChange();
 

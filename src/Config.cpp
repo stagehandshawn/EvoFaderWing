@@ -1,6 +1,22 @@
 // Config.cpp
 #include "Config.h"
 
+static const uint8_t kDefaultDebugLevels[DEBUG_CHANNEL_COUNT] = {
+  DBG_ERROR, // SYSTEM
+  DBG_ERROR, // WEB
+  DBG_ERROR, // NETWORK
+  DBG_ERROR, // OSC
+  DBG_ERROR, // I2C_BUS
+  DBG_ERROR, // FADER_CORE
+  DBG_OFF,   // FADER_POSITION
+  DBG_ERROR, // TOUCH_CORE
+  DBG_OFF,   // TOUCH_RAW
+  DBG_ERROR, // CALIBRATION
+  DBG_ERROR, // EEPROM
+  DBG_ERROR, // LED_EXEC
+  DBG_ERROR  // OLED
+};
+
 //================================
 // MAIN FADER ARRAY
 //================================
@@ -45,8 +61,24 @@ FaderConfig Fconfig = {
   .fadeTime = 500,
   .serialDebug = debugMode,
   .sendKeystrokes = false,
-  .useLevelPixels = false
-
+  .useLevelPixels = false,
+  .allowFaderOscWithoutTouch = true,
+  .debugConfigVersion = DEBUG_CONFIG_VERSION,
+  .debugLevel = {
+    DBG_ERROR, // SYSTEM
+    DBG_ERROR, // WEB
+    DBG_ERROR, // NETWORK
+    DBG_ERROR, // OSC
+    DBG_ERROR, // I2C_BUS
+    DBG_ERROR, // FADER_CORE
+    DBG_OFF,   // FADER_POSITION
+    DBG_ERROR, // TOUCH_CORE
+    DBG_OFF,   // TOUCH_RAW
+    DBG_ERROR, // CALIBRATION
+    DBG_ERROR, // EEPROM
+    DBG_ERROR, // LED_EXEC
+    DBG_ERROR  // OLED
+  }
 };
 
 // Executor LED defaults
@@ -70,8 +102,7 @@ NetworkConfig netConfig = {
   IPAddress(192, 168, 0, 1),       // gateway
   IPAddress(255, 255, 255, 0),     // subnet
   IPAddress(192, 168, 0, 10),     // sendToIP (OSC target)
-  8000,                            // receivePort (OSC listening)
-  9000,                            // sendPort (OSC destination)
+  kOSCPort,                        // oscPort (shared OSC send/receive)
   true                             // useDHCP (fallback to static if false)
 };
 
@@ -108,3 +139,37 @@ uint8_t releaseThreshold = 6;     // Lower = harder to release (MPR121 default)
 
 // Page Tracking
 int currentOSCPage = 1;  // Default to page 1
+
+void loadDefaultDebugLevels(uint8_t* levels, size_t count) {
+  if (levels == nullptr || count == 0) {
+    return;
+  }
+
+  size_t maxCount = count;
+  if (maxCount > DEBUG_CHANNEL_COUNT) {
+    maxCount = DEBUG_CHANNEL_COUNT;
+  }
+
+  for (size_t i = 0; i < maxCount; ++i) {
+    levels[i] = kDefaultDebugLevels[i];
+  }
+}
+
+const char* debugChannelName(DebugChannel channel) {
+  switch (channel) {
+    case DBG_CH_SYSTEM: return "System";
+    case DBG_CH_WEB: return "Web";
+    case DBG_CH_NETWORK: return "Network";
+    case DBG_CH_OSC: return "OSC";
+    case DBG_CH_I2C_BUS: return "I2C Bus";
+    case DBG_CH_FADER_CORE: return "Fader Control";
+    case DBG_CH_FADER_POSITION: return "Fader Output";
+    case DBG_CH_TOUCH_CORE: return "Touch Core";
+    case DBG_CH_TOUCH_RAW: return "Touch Raw";
+    case DBG_CH_CALIBRATION: return "Calibration";
+    case DBG_CH_EEPROM: return "EEPROM";
+    case DBG_CH_LED_EXEC: return "Exec LEDs";
+    case DBG_CH_OLED: return "OLED";
+    default: return "Unknown";
+  }
+}

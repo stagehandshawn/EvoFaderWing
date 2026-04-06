@@ -8,9 +8,9 @@
       "problemMatcher": []
     },
     {
-      "label": "Teensy Auto Upload",
+      "label": "Teensy Multi Auto Upload",
       "type": "shell",
-      "command": "python3 teensy_auto_upload.py",
+      "command": "python3 teensy_auto_upload_multi.py",
       "problemMatcher": []
     }
   ]

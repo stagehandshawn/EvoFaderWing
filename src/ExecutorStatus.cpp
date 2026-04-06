@@ -3,7 +3,6 @@
 #include "Utils.h"
 #include "KeyLedControl.h"
 
-bool execDebug = false;
 // List of executors we track, ordered the same way they are sent over OSC
 const uint16_t EXECUTOR_IDS[NUM_EXECUTORS_TRACKED] = {
   101, 102, 103, 104, 105, 106, 107, 108, 109, 110,
@@ -34,10 +33,6 @@ bool setExecutorStateByIndex(int index, uint8_t status) {
   bool changed = executorStatus[index] != clamped;
   executorStatus[index] = clamped;
 
-  if (execDebug){
-    debugPrintf("Exec %d state: %d", EXECUTOR_IDS[index], status);
-  }
-  
   return changed;
 }
 

@@ -1,13 +1,14 @@
 // === OLED.cpp ===
 // Simple OLED wrapper using Adafruit SSD1306 library
 // Designed for Teensy 4.1 fader wing project
-// Provides easy variable display functions for your 128x64 SSD1306 display
+// Provides helper functions for a 128x64 SSD1306 display
 
 #include "OLED.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <IPAddress.h>
 #include "Config.h"
+#include "Utils.h"
 
 static bool ipScreenDirty = true; // track when IP screen needs redraw
 
@@ -31,20 +32,20 @@ OLED::~OLED() {
 
 bool OLED::begin() {
     // Try to auto-detect the display address by testing common addresses
-    debugPrint("[OLED] Auto-detect...");
+    OLED_DEBUG_PRINT("Auto-detect...");
     
-    // Test primary address first (most common for your blue/yellow displays)
+    // Test the primary address first because it is the most common variant
     if (testAddress(OLED_ADDR_PRIMARY)) {
         i2cAddress = OLED_ADDR_PRIMARY;
-        debugPrintf("[OLED] Found 0x%02X", i2cAddress);
+        OLED_DEBUG_PRINTF("Found 0x%02X", i2cAddress);
     }
     // Test secondary address if primary failed
     else if (testAddress(OLED_ADDR_SECONDARY)) {
         i2cAddress = OLED_ADDR_SECONDARY;
-        debugPrintf("[OLED] Found 0x%02X", i2cAddress);
+        OLED_DEBUG_PRINTF("Found 0x%02X", i2cAddress);
     }
     else {
-        debugPrint("[OLED] ERR: No display");
+        OLED_ERROR_PRINT("No display");
         return false;
     }
     
@@ -55,7 +56,7 @@ bool OLED::begin() {
     
     // Initialize the display using Adafruit library
     if (!oledDisplay->begin(SSD1306_SWITCHCAPVCC, i2cAddress)) {
-        debugPrint("[OLED] ERR: alloc failed");
+        OLED_ERROR_PRINT("alloc failed");
         //delete oledDisplay;
         //oledDisplay = nullptr;
         oledDisplay.reset();  // New Method
@@ -69,13 +70,13 @@ bool OLED::begin() {
     oledDisplay->cp437(true);                       // Use full 256 character 'Code Page 437' font
     
     displayInitialized = true;
-    debugPrint("[OLED] Init ok");
+    OLED_DEBUG_PRINT("Init ok");
     return true;
 }
 
 bool OLED::begin(uint8_t address) {
     // Initialize with user-specified address
-    debugPrintf("[OLED] Init at 0x%02X", address);
+    OLED_DEBUG_PRINTF("Init at 0x%02X", address);
     
     if (testAddress(address)) {
         i2cAddress = address;
@@ -86,7 +87,7 @@ bool OLED::begin(uint8_t address) {
         
         // Initialize the display using Adafruit library
         if (!oledDisplay->begin(SSD1306_SWITCHCAPVCC, i2cAddress)) {
-            debugPrint("[OLED] ERR: alloc failed");
+            OLED_ERROR_PRINT("alloc failed");
             //delete oledDisplay;
             //oledDisplay = nullptr;
             oledDisplay.reset();  //New method
@@ -100,10 +101,10 @@ bool OLED::begin(uint8_t address) {
         oledDisplay->cp437(true);
         
         displayInitialized = true;
-        debugPrint("[OLED] Init ok");
+        OLED_DEBUG_PRINT("Init ok");
         return true;
     } else {
-        debugPrintf("[OLED] ERR: No dsp at 0x%02X", address);
+        OLED_ERROR_PRINTF("No dsp at 0x%02X", address);
         return false;
     }
 }
@@ -136,28 +137,28 @@ void OLED::setBrightness(uint8_t brightness) {
     if (!displayInitialized || !oledDisplay) return;
     oledDisplay->ssd1306_command(SSD1306_SETCONTRAST);
     oledDisplay->ssd1306_command(brightness);
-    debugPrintf("[OLED] Brightness set to %d", brightness);
+    OLED_DEBUG_PRINTF("Brightness set to %d", brightness);
 }
 
 void OLED::setInverted(bool inverted) {
     // Set normal or inverted display mode
     if (!displayInitialized || !oledDisplay) return;
     oledDisplay->invertDisplay(inverted);
-    debugPrintf("[OLED] Display mode: %s", inverted ? "INVERTED" : "NORMAL");
+    OLED_DEBUG_PRINTF("Display mode: %s", inverted ? "INVERTED" : "NORMAL");
 }
 
 void OLED::powerOff() {
     // Turn display off (sleep mode)
     if (!displayInitialized || !oledDisplay) return;
     oledDisplay->ssd1306_command(SSD1306_DISPLAYOFF);
-    debugPrint("[OLED] Display powered off");
+    OLED_DEBUG_PRINT("Display powered off");
 }
 
 void OLED::powerOn() {
     // Turn display on (wake from sleep)
     if (!displayInitialized || !oledDisplay) return;
     oledDisplay->ssd1306_command(SSD1306_DISPLAYON);
-    debugPrint("[OLED] Display powered on");
+    OLED_DEBUG_PRINT("Display powered on");
 }
 
 // === Public Text Functions ===
@@ -331,10 +332,10 @@ void OLED::fillCircle(int16_t x, int16_t y, int16_t r) {
 // === High-Level Setup Function ===
 
 void OLED::setupOLED() {
-    // Complete OLED setup function - call this from your main setup()
+    // Complete OLED setup helper for the main startup path
     // Handles initialization, error checking, and welcome display
     
-    debugPrint("[OLED] Starting OLED");
+    OLED_DEBUG_PRINT("Starting OLED");
     
     // Attempt to initialize the display with auto-detection
     if (begin()) {
@@ -391,8 +392,8 @@ void OLED::setupOLED() {
         
     } else {
         // Display initialization failed
-        debugPrint("[OLED] ERROR: Init failed");
-        debugPrint("[OLED] Check wiring");
+        OLED_ERROR_PRINT("Init failed");
+        OLED_ERROR_PRINT("Check wiring");
     }
 }
 
@@ -427,46 +428,73 @@ void OLED::clearDebugLines() {
     // Debug output to OLED is disabled.
 }
 
-void OLED::showIPAddress(IPAddress ip, uint16_t recvPort, IPAddress sendIP, uint16_t sendPort) {
+void OLED::showIPAddress(IPAddress ip, uint16_t oscPort, IPAddress sendIP) {
+    showNetworkStatus(OLEDNetworkState::ConnectedStatic, ip, oscPort, sendIP);
+}
+
+void OLED::showNetworkStatus(OLEDNetworkState state, IPAddress ip, uint16_t oscPort, IPAddress sendIP) {
     if (!displayInitialized || !oledDisplay) return;
 
+    static OLEDNetworkState lastState = OLEDNetworkState::LinkDown;
     static IPAddress lastIP(0, 0, 0, 0);
     static IPAddress lastSendIP(0, 0, 0, 0);
-    static uint16_t lastRecvPort = 0;
-    static uint16_t lastSendPort = 0;
+    static uint16_t lastOscPort = 0;
     static bool hasLast = false;
 
-    if (!ipScreenDirty && hasLast && ip == lastIP && recvPort == lastRecvPort && sendIP == lastSendIP && sendPort == lastSendPort) {
-        return; // No change, skip redraw
+    if (!ipScreenDirty && hasLast &&
+        state == lastState &&
+        ip == lastIP &&
+        oscPort == lastOscPort &&
+        sendIP == lastSendIP) {
+        return;
     }
 
     clear();
 
-    // First line: Header
     setCursor(0, 0);
     setTextSize(TEXT_SIZE_SMALL);
     print("EvoFaderWing");
 
     setCursor(0, CHAR_HEIGHT_SMALL * 2);
-    print("Receive:");
+    switch (state) {
+        case OLEDNetworkState::LinkDown:
+            print("Link Down");
+            break;
+        case OLEDNetworkState::ConnectingLink:
+            print("Connecting Link");
+            break;
+        case OLEDNetworkState::ConnectingDhcp:
+            print("Connecting DHCP");
+            break;
+        case OLEDNetworkState::ConnectingStatic:
+            print("Connecting Static");
+            break;
+        case OLEDNetworkState::ConnectedDhcp:
+            print("Connected DHCP");
+            break;
+        case OLEDNetworkState::ConnectedStatic:
+            print("Connected Static");
+            break;
+        case OLEDNetworkState::DhcpStaticFallback:
+            print("DHCP->Static");
+            break;
+    }
 
-    // Receive IP and port
     setCursor(0, CHAR_HEIGHT_SMALL * 3);
-    printf("%d.%d.%d.%d:%d", ip[0], ip[1], ip[2], ip[3], recvPort);
+    printf("%d.%d.%d.%d:%d", ip[0], ip[1], ip[2], ip[3], oscPort);
 
-    setCursor(0, CHAR_HEIGHT_SMALL * 4);
-    print("Send:");
-
-    // Send IP and port
     setCursor(0, CHAR_HEIGHT_SMALL * 5);
-    printf("%d.%d.%d.%d:%d", sendIP[0], sendIP[1], sendIP[2], sendIP[3], sendPort);
+    print("grandMA3:");
+
+    setCursor(0, CHAR_HEIGHT_SMALL * 6);
+    printf("%d.%d.%d.%d:%d", sendIP[0], sendIP[1], sendIP[2], sendIP[3], oscPort);
 
     display();
 
+    lastState = state;
     lastIP = ip;
     lastSendIP = sendIP;
-    lastRecvPort = recvPort;
-    lastSendPort = sendPort;
+    lastOscPort = oscPort;
     hasLast = true;
     ipScreenDirty = false;
 }

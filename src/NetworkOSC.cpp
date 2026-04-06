@@ -15,8 +15,7 @@
 //================================
 
 AsyncUDP oscUdp;
-
-bool faderColorDebug = false;
+static bool networkServicesStarted = false;
 
 //================================
 // OSC QUEUE (keeps UDP callback short)
@@ -97,9 +96,9 @@ static void attachUdpHandler() {
       const uint32_t now = millis();
       if (now - lastDropPrint > 500) { // rate-limit debug spam
         if (len > OSC_MAX_PACKET_SIZE) {
-          debugPrintf("[OSC] Drop oversize packet %u bytes (max %u)", len, OSC_MAX_PACKET_SIZE);
+          OSC_ERROR_PRINTF("Drop oversize packet %u bytes (max %u)", len, OSC_MAX_PACKET_SIZE);
         } else {
-          debugPrintf("[OSC] Queue full (%u/%u) dropping incoming packet", oscQueueCount, OSC_QUEUE_DEPTH);
+          OSC_ERROR_PRINTF("Queue full (%u/%u) dropping incoming packet", oscQueueCount, OSC_QUEUE_DEPTH);
         }
         lastDropPrint = now;
       }
@@ -107,58 +106,39 @@ static void attachUdpHandler() {
   });
 }
 
-void setupNetwork() {
-  debugPrint("Setting up network...");
-  
-  delay(100); //make sure we see network debug message before looking for dhcp so we know we are booting up
-
-  Ethernet.setHostname(kServiceName);
-
-  // Start Ethernet with configured settings
-  if (netConfig.useDHCP) {
-    debugPrint("Using DHCP...");
-    if (!Ethernet.begin() || !Ethernet.waitForLocalIP(kDHCPTimeout)) {
-      debugPrint("Failed DHCP, switching to static IP");
-      Ethernet.begin(netConfig.staticIP, netConfig.subnet, netConfig.gateway);
-    }
-  } else {
-    debugPrint("Using static IP...");
-    Ethernet.begin(netConfig.staticIP, netConfig.subnet, netConfig.gateway);
+void startNetworkServices() {
+  if (networkServicesStarted) {
+    return;
   }
 
-  IPAddress ip = Ethernet.localIP();
-  debugPrintf("IP Address: %u.%u.%u.%u\n", ip[0], ip[1], ip[2], ip[3]);
+  bool mdnsOk = MDNS.begin(kServiceName);
+  if (!mdnsOk) {
+    NETWORK_ERROR_PRINT("Failed to initialize mDNS");
+  }
+  MDNS.addService("_osc", "_udp", netConfig.oscPort);
 
-  // Set up mDNS for service discovery
-  MDNS.begin(kServiceName);
-  MDNS.addService("_osc", "_udp", netConfig.receivePort);
-
-  // Start AsyncUDP listener
-  if (oscUdp.listen(netConfig.receivePort)) {
+  if (oscUdp.listen(netConfig.oscPort)) {
     attachUdpHandler();
-    debugPrintf("AsyncUDP listening on port %d\n", netConfig.receivePort);
+    networkServicesStarted = true;
+    NETWORK_DEBUG_PRINTF("OSC services started on port %u", netConfig.oscPort);
   } else {
-    debugPrint("Failed to start AsyncUDP listener");
+    NETWORK_ERROR_PRINT("Failed to start AsyncUDP listener");
   }
-  debugPrint("OSC and mDNS initialized");
 }
 
-// Restart UDP after changes to network settings
-void restartUDP() {
-  debugPrint("Restarting UDP service...");
-
-  oscUdp.close();
-  delay(10);
-
-  if (oscUdp.listen(netConfig.receivePort)) {
-    attachUdpHandler();
-    debugPrintf("UDP restarted on port %d\n", netConfig.receivePort);
-  } else {
-    debugPrint("Failed to restart UDP.");
+void stopNetworkServices() {
+  if (!networkServicesStarted) {
+    return;
   }
+  oscUdp.close();
+  networkServicesStarted = false;
+  NETWORK_DEBUG_PRINT("OSC services stopped");
+}
 
-  // Re-register mDNS if needed
-  MDNS.addService("_osc", "_udp", netConfig.receivePort);
+void restartNetworkServices() {
+  stopNetworkServices();
+  delay(10);
+  startNetworkServices();
 }
 
 
@@ -171,7 +151,7 @@ static void handleOscPacket(const uint8_t* data, size_t len) {
   LiteOSCParser parser;
 
   if (!parser.parse(data, len)) {
-    debugPrint("Invalid OSC message.");
+    OSC_ERROR_PRINT("Invalid OSC message.");
     return;
   }
 
@@ -218,7 +198,7 @@ void processOscQueue() {
     oscOversizeDrops = 0;
     interrupts();
 
-    debugPrintf("[OSC] queue drops=%lu oversize=%lu depth=%u", drops, oversize, depth);
+    OSC_ERROR_PRINTF("queue drops=%lu oversize=%lu depth=%u", drops, oversize, depth);
     lastDropLog = now;
   }
 }
@@ -227,7 +207,7 @@ void processOscQueue() {
 void handlePageUpdate(const char *address, int value) {
   if (strstr(address, "/updatePage/current") != NULL) {
     if (value != currentOSCPage) {
-      debugPrintf("Page changed from %d to %d (via updatePage command)\n", currentOSCPage, value);
+      OSC_DEBUG_PRINTF("Page changed from %d to %d (via updatePage command)", currentOSCPage, value);
     }
     currentOSCPage = value;
   }
@@ -270,10 +250,6 @@ static void applyColorToExecutor(int oscId, const char* colorString) {
       faders[faderIndex].red = r;
       faders[faderIndex].green = g;
       faders[faderIndex].blue = b;
-
-      if (faderColorDebug) {
-        debugPrintf("Fader %d: Using RGB(%d,%d,%d)\n", oscId, r, g, b);
-      }
     }
   }
 }
@@ -284,24 +260,23 @@ void handleBundledExecutorUpdate(LiteOSCParser& parser) {
   const int expectedArgs = 1 + 10 + NUM_EXECUTORS_TRACKED;
 
   if (parser.getArgCount() < expectedArgs) {
-    debugPrint("Invalid exec bundle - not enough arguments");
+    OSC_ERROR_PRINT("Invalid exec bundle - not enough arguments");
     return;
   }
 
   if (parser.getTag(0) != 'i') {
-    debugPrint("Invalid exec bundle - page not integer");
+    OSC_ERROR_PRINT("Invalid exec bundle - page not integer");
     return;
   }
 
   int pageNum = parser.getInt(0);
-  if (pageNum != currentOSCPage) {
-    debugPrintf("Page changed from %d to %d (via exec bundle)\n", currentOSCPage, pageNum);
-    currentOSCPage = pageNum;
-  }
+  currentOSCPage = pageNum;
 
   bool stateChanged = false;
   bool needToMoveFaders = false;
   bool blockFaderUpdates = calibrationInProgress;
+  int changedFaders = 0;
+  int changedExecs = 0;
 
   // Fader values (201-210) occupy args 1-10
   for (int i = 0; i < 10; i++) {
@@ -309,7 +284,7 @@ void handleBundledExecutorUpdate(LiteOSCParser& parser) {
     int faderOscID = 201 + i;
 
     if (parser.getTag(argIndex) != 'i') {
-      debugPrintf("Invalid fader value type for fader %d\n", faderOscID);
+      OSC_ERROR_PRINTF("Invalid fader value type for fader %d", faderOscID);
       continue;
     }
 
@@ -321,16 +296,21 @@ void handleBundledExecutorUpdate(LiteOSCParser& parser) {
     }
 
     if (faderIndex >= 0 && faderIndex < NUM_FADERS) {
-      if (!faders[faderIndex].touched) {
+      bool localOwnershipActive = faders[faderIndex].touched;
+      if (Fconfig.allowFaderOscWithoutTouch) {
+        localOwnershipActive = localOwnershipActive || faders[faderIndex].manualOverride;
+      }
+
+      if (!localOwnershipActive) {
         int currentOscvalue = readFadertoOSC(faders[faderIndex]);
         if (abs(oscValue - currentOscvalue) > Fconfig.targetTolerance) {
-          debugPrintf("Updating fader %d setpoint: %d -> %d\n", faderOscID, currentOscvalue, oscValue);
           setFaderSetpoint(faderIndex, oscValue);
           needToMoveFaders = true;
+          changedFaders++;
         }
       }
     } else {
-      debugPrintf("Fader index not found for OSC ID %d\n", faderOscID);
+      OSC_ERROR_PRINTF("Fader index not found for OSC ID %d", faderOscID);
     }
   }
 
@@ -338,7 +318,7 @@ void handleBundledExecutorUpdate(LiteOSCParser& parser) {
   for (int i = 0; i < NUM_EXECUTORS_TRACKED; ++i) {
     int argIndex = 11 + i;
     if (parser.getTag(argIndex) != 'i') {
-      debugPrintf("Invalid exec status type for executor %d\n", EXECUTOR_IDS[i]);
+      OSC_ERROR_PRINTF("Invalid exec status type for executor %d", EXECUTOR_IDS[i]);
       continue;
     }
 
@@ -346,6 +326,7 @@ void handleBundledExecutorUpdate(LiteOSCParser& parser) {
     uint8_t status = raw < 0 ? 0 : (raw > 2 ? 2 : raw); // 0=empty,1=off,2=on
     if (setExecutorStateByIndex(i, status)) {
       stateChanged = true;
+      changedExecs++;
     }
   }
 
@@ -353,8 +334,12 @@ void handleBundledExecutorUpdate(LiteOSCParser& parser) {
     markKeyLedsDirty();
   }
 
+  if (changedFaders > 0 || changedExecs > 0) {
+    OSC_DEBUG_PRINTF("Exec update received: page=%d faders=%d execs=%d",
+                     pageNum, changedFaders, changedExecs);
+  }
+
   if (needToMoveFaders) {
-    debugPrint("Moving faders to new setpoints");
     moveAllFadersToSetpoints();
   }
 }
@@ -364,29 +349,34 @@ void handleColorUpdate(LiteOSCParser& parser) {
   const int expectedArgs = 1 + NUM_EXECUTORS_TRACKED;
 
   if (parser.getArgCount() < expectedArgs) {
-    debugPrint("Invalid color bundle - not enough arguments");
+    OSC_ERROR_PRINT("Invalid color bundle - not enough arguments");
     return;
   }
 
   if (parser.getTag(0) != 'i') {
-    debugPrint("Invalid color bundle - page not integer");
+    OSC_ERROR_PRINT("Invalid color bundle - page not integer");
     return;
   }
 
   int pageNum = parser.getInt(0);
-  if (pageNum != currentOSCPage) {
-    debugPrintf("Page changed from %d to %d (via color bundle)\n", currentOSCPage, pageNum);
-    currentOSCPage = pageNum;
-  }
+  currentOSCPage = pageNum;
+  int appliedColors = 0;
 
   for (int i = 0; i < NUM_EXECUTORS_TRACKED; ++i) {
     int argIndex = i + 1;
     if (parser.getTag(argIndex) != 's') {
-      debugPrintf("Invalid color type for executor %d\n", EXECUTOR_IDS[i]);
+      OSC_ERROR_PRINTF("Invalid color type for executor %d", EXECUTOR_IDS[i]);
       continue;
     }
     applyColorToExecutor(EXECUTOR_IDS[i], parser.getString(argIndex));
+    appliedColors++;
   }
+
+  // Left disabled for now because grandMA can send color bundles continuously
+  // during normal fader movement, which floods the serial monitor.
+  // if (appliedColors > 0) {
+  //   OSC_DEBUG_PRINTF("Color update received: page=%d colors=%d", pageNum, appliedColors);
+  // }
 }
 
 
@@ -425,11 +415,11 @@ void sendOscMessage(const char* address, const char* typeTag, const void* value)
     buffer[len++] = '\0';
     while (len % 4 != 0) buffer[len++] = '\0';
   } else {
-    debugPrint("Unsupported OSC typeTag.");
+    OSC_ERROR_PRINT("Unsupported OSC typeTag.");
     return;
   }
 
-  oscUdp.writeTo(buffer, len, netConfig.sendToIP, netConfig.sendPort);
+  oscUdp.writeTo(buffer, len, netConfig.sendToIP, netConfig.oscPort);
 }
 
 

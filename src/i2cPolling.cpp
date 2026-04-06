@@ -6,6 +6,7 @@
 // NO button press handling - encoders send rotation data, keyboard sends key events
 
 #include <Wire.h>
+#include <string.h>
 #include "i2cPolling.h"
 #include "Utils.h"
 #include "EEPROMStorage.h"
@@ -14,14 +15,11 @@
 
 // There are a lot of safeguards here to handle noisy i2c lines so even the most EMI unfriendly build should behave well
 
-bool i2cDebug = false;
-bool i2cErrorDebug = true;
-
-// Local helpers to gate all I2C logging behind i2cDebug
-#define I2C_DEBUG_PRINT(msg)    do { if (i2cDebug) debugPrint(msg); } while (0)
-#define I2C_DEBUG_PRINTF(...)   do { if (i2cDebug) debugPrintf(__VA_ARGS__); } while (0)
-#define I2C_ERROR_PRINT(msg)    do { if (i2cErrorDebug) debugPrint(msg); } while (0)
-#define I2C_ERROR_PRINTF(...)   do { if (i2cErrorDebug) debugPrintf(__VA_ARGS__); } while (0)
+// I2C bus-level log wrappers map directly to unified debug channels.
+#define I2C_DEBUG_PRINT(msg) I2C_BUS_DEBUG_PRINT(msg)
+#define I2C_DEBUG_PRINTF(...) I2C_BUS_DEBUG_PRINTF(__VA_ARGS__)
+#define I2C_ERROR_PRINT(msg) I2C_BUS_ERROR_PRINT(msg)
+#define I2C_ERROR_PRINTF(...) I2C_BUS_ERROR_PRINTF(__VA_ARGS__)
 
 // Track last known pressed keys so the watchdog can force releases
 static bool trackedKeyStates[NUM_EXECUTORS_TRACKED] = {false};
@@ -69,16 +67,73 @@ const int numSlaves = sizeof(slaveAddresses) / sizeof(slaveAddresses[0]);
 unsigned long lastPollTimeSimple = 0;          
 const unsigned long I2C_POLL_INTERVAL_SIMPLE = 10;    // Poll every 10ms instead of 1ms
 int resetPressCount = 0;
-static int i2cErrorStreak = 0;
+static uint8_t slaveErrorStreak[numSlaves] = {0};
+static uint8_t slaveMissStreak[numSlaves] = {0};
 static uint8_t slaveBackoff[numSlaves] = {0};
 const uint8_t I2C_BACKOFF_CYCLES = 3; // skip a few cycles for a noisy slave
+const uint8_t I2C_ERROR_STREAK_LIMIT = 3;
+const uint8_t I2C_MISS_BACKOFF_THRESHOLD = 3;
+const uint8_t I2C_BUS_STUCK_CYCLES = 2;
+static uint8_t allSlavesMissCycleStreak = 0;
+static uint8_t pollAttemptsThisCycle = 0;
+static uint8_t noResponsePollsThisCycle = 0;
+
+static uint8_t maxCountForFrame(uint8_t address, uint8_t dataType) {
+  if (address == I2C_ADDR_KEYBOARD) {
+    if (dataType == DATA_TYPE_KEYPRESS) return 4;
+    if (dataType == DATA_TYPE_RELEASE_ALL) return 0;
+    return 0xFF;
+  }
+
+  if (dataType == DATA_TYPE_ENCODER) return 5;
+  return 0xFF;
+}
+
+static int bytesPerEventForType(uint8_t dataType) {
+  switch (dataType) {
+    case DATA_TYPE_ENCODER:
+      return 2;
+    case DATA_TYPE_KEYPRESS:
+      return 3;
+    case DATA_TYPE_RELEASE_ALL:
+      return 0;
+    default:
+      return -1;
+  }
+}
+
+static void clearSlaveFaultState(int slaveIndex) {
+  if (slaveIndex < 0 || slaveIndex >= numSlaves) return;
+  slaveErrorStreak[slaveIndex] = 0;
+  slaveMissStreak[slaveIndex] = 0;
+}
+
+static void handleNoResponseMiss(uint8_t address, int slaveIndex) {
+  I2C_ERROR_PRINTF("[I2C MISS] no response from 0x%02X", address);
+
+  if (slaveIndex < 0 || slaveIndex >= numSlaves) return;
+
+  uint8_t missCount = ++slaveMissStreak[slaveIndex];
+  if (missCount >= I2C_MISS_BACKOFF_THRESHOLD) {
+    slaveBackoff[slaveIndex] = I2C_BACKOFF_CYCLES;
+    I2C_ERROR_PRINTF("[I2C BACKOFF] applying to slave 0x%02X after %u misses", address, missCount);
+    slaveMissStreak[slaveIndex] = 0;
+  }
+}
 
 void resetI2CBus() {
   Wire.end();
   delay(1);                  // brief settle to let ICs reset if called from an error
   Wire.begin();                
-  Wire.setClock(400000);       // 100kHz for stability (400khz is working without any errors)
+  Wire.setClock(400000);       // Preserve the existing bus speed for this standalone build
   Wire.setTimeout(5);         // Short timeout to avoid bus hangs
+
+  memset(slaveBackoff, 0, sizeof(slaveBackoff));
+  memset(slaveErrorStreak, 0, sizeof(slaveErrorStreak));
+  memset(slaveMissStreak, 0, sizeof(slaveMissStreak));
+  allSlavesMissCycleStreak = 0;
+  pollAttemptsThisCycle = 0;
+  noResponsePollsThisCycle = 0;
 }
 
 // === SETUP FUNCTION ===
@@ -107,16 +162,30 @@ void handleI2c() {
   
   if (currentTime - lastPollTimeSimple >= I2C_POLL_INTERVAL_SIMPLE) {
     lastPollTimeSimple = currentTime;  
+    pollAttemptsThisCycle = 0;
+    noResponsePollsThisCycle = 0;
     
     // Poll each slave with extra safety
     for (int i = 0; i < numSlaves; i++) {
-    if (slaveBackoff[i] > 0) {
+      if (slaveBackoff[i] > 0) {
         I2C_ERROR_PRINTF("[I2C BACKOFF] skipping slave 0x%02X detail=%d", slaveAddresses[i], slaveBackoff[i]);
         slaveBackoff[i]--;
         continue;
       }
       pollSlave(slaveAddresses[i], i);  
       delay(1); // Small delay between slave polls
+    }
+
+    if (pollAttemptsThisCycle > 0 && noResponsePollsThisCycle == pollAttemptsThisCycle) {
+      allSlavesMissCycleStreak++;
+      if (allSlavesMissCycleStreak >= I2C_BUS_STUCK_CYCLES) {
+        I2C_ERROR_PRINTF("[I2C ERR] bus-stuck suspected (%u/%u no-response polls), resetting bus",
+                         noResponsePollsThisCycle, pollAttemptsThisCycle);
+        allSlavesMissCycleStreak = 0;
+        resetI2CBus();
+      }
+    } else {
+      allSlavesMissCycleStreak = 0;
     }
   }
 }
@@ -129,99 +198,82 @@ void pollSlave(uint8_t address, int slaveIndex) {
   // Request data from slave
   uint8_t bytesRequested = 16; // Smaller request size
   uint8_t received = Wire.requestFrom(address, bytesRequested);
-  
-  // Wait a bit for response Added for stability testing no longer needed
-  //delay(1);
+  pollAttemptsThisCycle++;
 
-  if (received != bytesRequested) {
-    I2C_ERROR_PRINTF("[I2C ERR] short read from 0x%02X: got %d/%d", address, received, bytesRequested);
+  if (received == 0) {
+    noResponsePollsThisCycle++;
+    while (Wire.available()) Wire.read();
+    handleNoResponseMiss(address, slaveIndex);
+    return;
+  }
+
+  if (received < 2 || Wire.available() < 2) {
+    I2C_ERROR_PRINTF("[I2C ERR] short header from 0x%02X: got %d bytes", address, received);
     while (Wire.available()) Wire.read();
     if (slaveIndex >= 0 && slaveIndex < numSlaves) {
       slaveBackoff[slaveIndex] = I2C_BACKOFF_CYCLES;
-    }
-    if (++i2cErrorStreak >= 3) {
-      I2C_ERROR_PRINTF("[I2C ERR] resetting bus after repeated short reads on 0x%02X", address);
-      i2cErrorStreak = 0;
-      resetI2CBus();
+      if (++slaveErrorStreak[slaveIndex] >= I2C_ERROR_STREAK_LIMIT) {
+        I2C_ERROR_PRINTF("[I2C ERR] resetting bus after repeated short headers on 0x%02X", address);
+        slaveErrorStreak[slaveIndex] = 0;
+        resetI2CBus();
+      }
     }
     return;
   }
-  
+
   bool errorFrame = false;
   
-  // Check if we got minimum required data
-  if (received < 2 || Wire.available() < 2) {
-    errorFrame = true;
-  }
-  
   // Read header
-  uint8_t dataType = errorFrame ? 0 : Wire.read();  
-  uint8_t count = errorFrame ? 0 : Wire.read();     
+  uint8_t dataType = Wire.read();  
+  uint8_t count = Wire.read();
 
-  // Short-circuit release-all frames: they should have count==0 and no payload
-  if (!errorFrame && dataType == DATA_TYPE_RELEASE_ALL) {
-    if (count == 0) {
-      I2C_DEBUG_PRINTF("[I2C] Release-all heartbeat from 0x%02X", address);
-      processReleaseAll(address);
-      while (Wire.available()) Wire.read();
-      return;
-    } else {
-      I2C_ERROR_PRINTF("[I2C] ERR Release-all frame with non-zero count %d from slave 0x%02X", count, address);
-      errorFrame = true;
-    }
-  }
-  
-  // Validate data type first
-  if (!errorFrame && dataType != DATA_TYPE_ENCODER && dataType != DATA_TYPE_KEYPRESS && dataType != DATA_TYPE_RELEASE_ALL){
+  uint8_t maxCount = maxCountForFrame(address, dataType);
+  if (maxCount == 0xFF) {
     I2C_ERROR_PRINTF("[I2C] ERR Invalid data type 0x%02X from slave 0x%02X", dataType, address);
     errorFrame = true;
-  }
-  
-  // Validate count
-  if (!errorFrame && count > 10) {  // Reasonable maximum
-    I2C_ERROR_PRINTF("[I2C] ERR Unrealistic count %d from slave 0x%02X", count, address);
+  } else if (count > maxCount) {
+    I2C_ERROR_PRINTF("[I2C] ERR Unrealistic count %d for type 0x%02X from slave 0x%02X",
+                     count, dataType, address);
     errorFrame = true;
   }
-  
-  // Validate we have enough bytes for the claimed count
-  int bytesPerEvent = 0;
-  if (dataType == DATA_TYPE_ENCODER) {
-    bytesPerEvent = 2;
-  } else if (dataType == DATA_TYPE_KEYPRESS) {
-    bytesPerEvent = 3;
-  } else if (dataType == DATA_TYPE_RELEASE_ALL) {
-    bytesPerEvent = 0; // heartbeat carries no payload
+
+  if (!errorFrame && dataType == DATA_TYPE_RELEASE_ALL) {
+    I2C_DEBUG_PRINTF("[I2C] Release-all heartbeat from 0x%02X", address);
+    processReleaseAll(address);
+    clearSlaveFaultState(slaveIndex);
+    while (Wire.available()) Wire.read();
+    return;
   }
-  int expectedBytes = count * bytesPerEvent;
-  
+
+  int bytesPerEvent = bytesPerEventForType(dataType);
+  int expectedBytes = (bytesPerEvent < 0) ? 0 : (count * bytesPerEvent);
+
   if (!errorFrame && count > 0 && Wire.available() < expectedBytes) {
     I2C_ERROR_PRINTF("[I2C] ERR Not enough data: need %d, have %d from slave 0x%02X", 
                expectedBytes, Wire.available(), address);
     errorFrame = true;
   }
-  
-  // Additional validation: keyboard should never send encoder data
-  if (!errorFrame && address == I2C_ADDR_KEYBOARD && dataType == DATA_TYPE_ENCODER) {
-    I2C_ERROR_PRINTF("[I2C] ERR Keyboard slave 0x%02X sent encoder data - corrupted!", address);
-    errorFrame = true;
-  }
-  
+
   if (errorFrame) {
     while (Wire.available()) Wire.read();
     if (slaveIndex >= 0 && slaveIndex < numSlaves) {
-      slaveBackoff[slaveIndex] = I2C_BACKOFF_CYCLES; // give this slave a breather
+      slaveBackoff[slaveIndex] = I2C_BACKOFF_CYCLES;
       I2C_ERROR_PRINTF("[I2C ERR] bad frame, backoff applied to slave 0x%02X detail=%d", address, count);
-    }
-    if (++i2cErrorStreak >= 3) {
-      I2C_ERROR_PRINTF("[I2C ERR] resetting bus after repeated errors on 0x%02X", address);
-      i2cErrorStreak = 0;
-      resetI2CBus();
+      if (++slaveErrorStreak[slaveIndex] >= I2C_ERROR_STREAK_LIMIT) {
+        I2C_ERROR_PRINTF("[I2C ERR] resetting bus after repeated errors on 0x%02X", address);
+        slaveErrorStreak[slaveIndex] = 0;
+        resetI2CBus();
+      }
     }
     return;
   }
-  
-  // Good frame; clear error streak
-  i2cErrorStreak = 0;
+
+  if (slaveIndex >= 0 && slaveIndex < numSlaves) {
+    if (slaveErrorStreak[slaveIndex] > 0 || slaveMissStreak[slaveIndex] > 0) {
+      I2C_ERROR_PRINTF("[I2C RECOVER] slave 0x%02X frame OK", address);
+    }
+    clearSlaveFaultState(slaveIndex);
+  }
   
   // Process the validated data
   switch (dataType) {
@@ -241,9 +293,7 @@ void pollSlave(uint8_t address, int slaveIndex) {
 // === ENCODER PROCESSING ===
 void processEncoderData(uint8_t count, uint8_t address) {
   if (count == 0) return;
-  
-  I2C_DEBUG_PRINTF("[ENC] Slave 0x%02X: %d encoder events", address, count);
-  
+
   for (int i = 0; i < count; i++) {
     if (Wire.available() < 2) {
       I2C_ERROR_PRINT("[I2C] ERR Not enough encoder data");
@@ -257,7 +307,7 @@ void processEncoderData(uint8_t count, uint8_t address) {
     bool isPositive = (encoderWithDir & 0x80) != 0; 
     
     // Validate encoder number and velocity
-    if (encoderNumber > 20) {
+    if (encoderNumber < 1 || encoderNumber > 20) {
       I2C_ERROR_PRINTF("[I2C] WARN Invalid encoder number: %d", encoderNumber);
       continue;
     }
@@ -266,7 +316,7 @@ void processEncoderData(uint8_t count, uint8_t address) {
       continue;
     }
     
-    I2C_DEBUG_PRINTF("  Encoder %d: %s%d", encoderNumber, isPositive ? "+" : "-", velocity);
+    I2C_DEBUG_PRINTF("0x%02X Encoder %d %s%d", address, encoderNumber, isPositive ? "+" : "-", velocity);
     
     sendEncoderOSC(encoderNumber, isPositive, velocity);                                   //ENCODER OSC SEND
   }
@@ -275,9 +325,7 @@ void processEncoderData(uint8_t count, uint8_t address) {
 // === KEYPRESS PROCESSING ===
 void processKeypressData(uint8_t count, uint8_t address) {
   if (count == 0) return;
-  
-  I2C_DEBUG_PRINTF("[KEY] Slave 0x%02X: %d key events", address, count);
-  
+
   for (int i = 0; i < count; i++) {
     if (Wire.available() < 3) {
       I2C_ERROR_PRINT("[I2C] WARN Not enough keypress data");
@@ -300,7 +348,7 @@ void processKeypressData(uint8_t count, uint8_t address) {
       continue;
     }
     
-    I2C_DEBUG_PRINTF("  Key %d: %s", keyNumber, state ? "PRESSED" : "RELEASED");
+    I2C_DEBUG_PRINTF("0x%02X Key %d %s", address, keyNumber, state ? "PRESSED" : "RELEASED");
 
     int keyIndex = keyIndexFromNumber(keyNumber);
     if (keyIndex >= 0 && keyIndex < NUM_EXECUTORS_TRACKED) {
@@ -444,4 +492,3 @@ void sendKeyOSC(uint16_t keyNumber, uint8_t state) {
   }
 
 }
-
