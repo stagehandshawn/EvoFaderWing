@@ -27,6 +27,7 @@ void initializeFaders() {
     faders[i].lastFailureTime = 0;
     faders[i].lastReportedValue = -1;
     faders[i].lastAnalogValue = -1;
+    faders[i].lastSampledOscValue = -1;
     faders[i].lastOscSendTime = 0;
     faders[i].oscID = OSC_IDS[i];
     
@@ -40,6 +41,9 @@ void initializeFaders() {
 
     // Initialize touch timing values
     faders[i].touched = false;
+    faders[i].manualOverride = false;
+    faders[i].manualLastMoveTime = 0;
+    faders[i].remoteControlLockoutUntil = 0;
     faders[i].touchStartTime = 0;
     faders[i].touchDuration = 0;
     faders[i].releaseTime = 0;
@@ -74,6 +78,8 @@ void configureFaderPins() {
     
     // Initialize state
     f.touched = false;
+    f.manualOverride = false;
+    f.remoteControlLockoutUntil = 0;
   }
 
 }
@@ -85,7 +91,7 @@ void configureFaderPins() {
 //================================
 
 void calibrateFaders() {
-  debugPrintf("Calibration started at PWM: %d\n", Fconfig.calibratePwm);
+  CAL_DEBUG_PRINTF("Calibration started at PWM: %d", Fconfig.calibratePwm);
   calibrationInProgress = true;
 
   // Re-enable any faders that were previously disabled due to movement failures
@@ -119,7 +125,7 @@ void calibrateFaders() {
  
     
     // ==================== MAX VALUE CALIBRATION ====================
-    debugPrintf("Fader %d → Calibrating Max...\n", i);
+    CAL_DEBUG_PRINTF("Fader %d -> Calibrating Max...", i);
     
     // SET YELLOW - Calibrating max
     f.red = 255; f.green = 255; f.blue = 0;
@@ -136,7 +142,7 @@ void calibrateFaders() {
     while (plateau < PLATEAU_COUNT) {
       // Check for timeout (10 seconds)
       if ((millis() - startTime) > calibrationTimeout) {
-        debugPrintf("ERROR: Fader %d MAX calibration timed out! Using default value of 245.\n", i);
+        CAL_ERROR_PRINTF("Fader %d MAX calibration timed out! Using default value of 245.", i);
         f.maxVal = 245;  // Use default max value
         break;  // Exit the loop
       }
@@ -161,7 +167,7 @@ void calibrateFaders() {
     delay(500);
 
     // ==================== MIN VALUE CALIBRATION ====================
-    debugPrint("→ Calibrating Min...");
+    CAL_DEBUG_PRINT("-> Calibrating Min...");
     
     // SET ORANGE - Calibrating min
     f.red = 0; f.green = 0; f.blue = 255;
@@ -178,7 +184,7 @@ void calibrateFaders() {
     while (plateau < PLATEAU_COUNT) {
       // Check for timeout 
       if ((millis() - startTime) > calibrationTimeout) {
-        debugPrintf("ERROR: Fader %d MIN calibration timed out! Using default value of 10.\n", i);
+        CAL_ERROR_PRINTF("Fader %d MIN calibration timed out! Using default value of 10.", i);
         f.minVal = 10;  // Use default min value
         break;  // Exit the loop
       }
@@ -214,7 +220,7 @@ void calibrateFaders() {
       bool spanTooSmall = (f.maxVal - f.minVal) < 153; // <60% span (255*0.6)
 
       if (minTooHigh || maxTooLow || spanTooSmall) {
-        debugPrintf("ERROR: Fader %d has invalid range! Min=%d, Max=%d (minTooHigh=%d maxTooLow=%d spanTooSmall=%d). Using defaults.\n", 
+        CAL_ERROR_PRINTF("Fader %d has invalid range! Min=%d, Max=%d (minTooHigh=%d maxTooLow=%d spanTooSmall=%d). Using defaults.",
                     i, f.minVal, f.maxVal, minTooHigh, maxTooLow, spanTooSmall);
         f.minVal = 10;
         f.maxVal = 245;
@@ -225,9 +231,9 @@ void calibrateFaders() {
     //bool faderFailed = !maxCalibrationSuccess || !minCalibrationSuccess || !rangeValid;
 
     if (maxCalibrationSuccess && minCalibrationSuccess && rangeValid) {
-      debugPrintf("→ Calibration Done: Min=%d Max=%d\n", f.minVal, f.maxVal);
+      CAL_DEBUG_PRINTF("-> Calibration Done: Min=%d Max=%d", f.minVal, f.maxVal);
     } else {
-      debugPrintf("→ Calibration INCOMPLETE for Fader %d: Min=%d Max=%d (Defaults applied where needed)\n", 
+      CAL_ERROR_PRINTF("-> Calibration INCOMPLETE for Fader %d: Min=%d Max=%d (Defaults applied where needed)",
                   i, f.minVal, f.maxVal);
       failedFaders[i] = true;
       // Keep failure indicated in red

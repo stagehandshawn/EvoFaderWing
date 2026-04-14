@@ -6,11 +6,16 @@
 #include "Utils.h"
 #include "NeoPixelControl.h"
 
-
-bool faderDebug = false;
 bool FaderRetryPending = false;
 unsigned long FaderRetryTime = 0;
 static bool FaderMoveActive = false;
+static const uint8_t MANUAL_DETECT_DELTA = 1;
+static const unsigned long MANUAL_OVERRIDE_HOLD_MS = 500;
+static const unsigned long REMOTE_CONTROL_LOCKOUT_MS = 800;
+
+static inline bool allowFaderOscWithoutTouchMode() {
+  return Fconfig.allowFaderOscWithoutTouch;
+}
 
 //================================
 // MOTOR CONTROL
@@ -47,11 +52,6 @@ void driveMotorWithPWM(Fader& f, int direction, int pwmValue) {
   
   // Apply custom PWM speed
   analogWrite(f.pwmPin, pwmValue);
-  
-  if (faderDebug) {
-    debugPrintf("Fader %d: Motor PWM: %d, Dir: %s, Setpoint: %d\n", 
-               f.oscID, pwmValue, direction > 0 ? "UP" : "DOWN", f.setpoint);
-  }
 }
 
 int calculateVelocityPWM(int difference) {
@@ -59,7 +59,7 @@ int calculateVelocityPWM(int difference) {
   
   // Define PWM ranges
   const int minPWM = Fconfig.minPwm;   // Minimum PWM to ensure movement (adjust as needed)
-  const int maxPWM = Fconfig.maxPwm;  // Use your existing max PWM
+  const int maxPWM = Fconfig.maxPwm;  // Use the configured maximum PWM
   
   // Define distance thresholds for different speeds
   int slowZone = Fconfig.slowZone;   // OSC units - start slowing earlier for smoother approach
@@ -128,7 +128,8 @@ void moveAllFadersToSetpoints() {
       int difference = f.setpoint - currentOscValue;
       
       // Check if we need to move this fader (using a smaller tolerance for OSC units) IF NOT TOUCHING IT
-      if (abs(difference) > Fconfig.targetTolerance && !f.touched) {
+      bool manualOwnershipActive = allowFaderOscWithoutTouchMode() && f.manualOverride;
+      if (abs(difference) > Fconfig.targetTolerance && !f.touched && !manualOwnershipActive) {
         allFadersAtTarget = false; // At least one fader is not at target
         
         if (difference > 0) {
@@ -139,11 +140,6 @@ void moveAllFadersToSetpoints() {
           // Need to move down  
           int pwm = calculateVelocityPWM(difference);
           driveMotorWithPWM(f, -1, pwm);
-        }
-
-        if (faderDebug) {
-          debugPrintf("Fader %d: Current OSC: %d, Target OSC: %d, Diff: %d\n", 
-                     f.oscID, currentOscValue, f.setpoint, difference);
         }
 
         } else {
@@ -175,7 +171,8 @@ void moveAllFadersToSetpoints() {
 
         int currentOscValue = readFadertoOSC(f);
         int difference = f.setpoint - currentOscValue;
-        if (abs(difference) > Fconfig.targetTolerance && !f.touched) {
+        bool manualOwnershipActive = allowFaderOscWithoutTouchMode() && f.manualOverride;
+        if (abs(difference) > Fconfig.targetTolerance && !f.touched && !manualOwnershipActive) {
           failed[i] = true;
           origColors[i][0] = f.red;
           origColors[i][1] = f.green;
@@ -220,9 +217,7 @@ void moveAllFadersToSetpoints() {
           f.red = 255;
           f.green = 0;
           f.blue = 0;
-          if (faderDebug) {
-            debugPrintf("Fader %d disabled after %u consecutive failures\n", f.oscID, f.failureCount);
-          }
+          FADER_ERROR_PRINTF("Fader %d disabled after %u consecutive failures", f.oscID, f.failureCount);
         } else {
           retryNeeded = true;
         }
@@ -236,12 +231,10 @@ void moveAllFadersToSetpoints() {
         FaderRetryPending = false;
       }
       
-      if (faderDebug) {
-        if (retryNeeded) {
-          debugPrintf("Fader movement timeout - will retry in %lu seconds\n", RETRY_INTERVAL/1000);
-        } else {
-          debugPrint("Fader movement timeout - disabling stuck fader(s) with no retry");
-        }
+      if (retryNeeded) {
+        FADER_ERROR_PRINTF("Fader movement timeout - will retry in %lu seconds", RETRY_INTERVAL / 1000);
+      } else {
+        FADER_ERROR_PRINT("Fader movement timeout - disabling stuck fader(s) with no retry");
       }
       break;
     }
@@ -255,9 +248,6 @@ void moveAllFadersToSetpoints() {
       }
     }
     FaderRetryPending = false;
-    if (faderDebug) {
-      debugPrintf("All faders have reached their setpoints\n");
-    }
   }
   FaderMoveActive = false;
 }
@@ -265,30 +255,77 @@ void moveAllFadersToSetpoints() {
 // Function to set a new setpoint for a specific fader (called when OSC message received)
 void setFaderSetpoint(int faderIndex, int oscValue) {
   if (faderIndex >= 0 && faderIndex < NUM_FADERS) {
-    // Store the OSC value (0-100) directly as setpoint
-    faders[faderIndex].setpoint = constrain(oscValue, 0, 100);
-    
-    if (faderDebug) {
-      debugPrintf("Fader %d setpoint set to OSC value: %d\n", 
-                 faders[faderIndex].oscID, oscValue);
+    Fader& f = faders[faderIndex];
+    f.setpoint = constrain(oscValue, 0, 100);
+
+    if (allowFaderOscWithoutTouchMode()) {
+      f.manualOverride = false;
+      f.remoteControlLockoutUntil = millis() + REMOTE_CONTROL_LOCKOUT_MS;
+    } else {
+      f.manualOverride = false;
+      f.remoteControlLockoutUntil = 0;
     }
+    
+    FADER_DEBUG_PRINTF("Setpoint updated: fader %d -> %d", f.oscID, f.setpoint);
   }
 }
 
 
 
 void handleFaders() {
+  unsigned long now = millis();
+  bool allowUntouchedOsc = allowFaderOscWithoutTouchMode();
+
   for (int i = 0; i < NUM_FADERS; i++) {
     Fader& f = faders[i];
 
-    if (!f.touched){    
-      continue;
-    }
-
-    // Read current position and get OSC value in one call
     int currentOscValue = readFadertoOSC(f);
 
-      // Force send when at top or bottom and ignore rate limiting
+    if (f.lastSampledOscValue < 0) {
+      f.lastSampledOscValue = currentOscValue;
+    }
+
+    if (!allowUntouchedOsc) {
+      f.manualOverride = false;
+      f.remoteControlLockoutUntil = 0;
+      f.lastSampledOscValue = currentOscValue;
+
+      if (!f.touched) {
+        continue;
+      }
+    } else {
+      int sampledDelta = abs(currentOscValue - f.lastSampledOscValue);
+      bool localMovement = (sampledDelta >= MANUAL_DETECT_DELTA);
+      bool remoteLockoutActive = (now < f.remoteControlLockoutUntil);
+
+      if (f.touched) {
+        f.manualOverride = false;
+      } else {
+        if (!FaderMoveActive && !calibrationInProgress && !remoteLockoutActive && localMovement) {
+          if (!f.manualOverride) {
+            FADER_DEBUG_PRINTF("Fader %d manual override ON", f.oscID);
+          }
+          f.manualOverride = true;
+          f.manualLastMoveTime = now;
+          f.setpoint = currentOscValue;
+        } else if (f.manualOverride) {
+          if (localMovement) {
+            f.manualLastMoveTime = now;
+            f.setpoint = currentOscValue;
+          } else if (now - f.manualLastMoveTime >= MANUAL_OVERRIDE_HOLD_MS) {
+            f.manualOverride = false;
+            FADER_DEBUG_PRINTF("Fader %d manual override OFF", f.oscID);
+          }
+        }
+      }
+
+      if (!f.touched && !f.manualOverride) {
+        f.lastSampledOscValue = currentOscValue;
+        continue;
+      }
+    }
+
+    // Force send when at top or bottom and ignore rate limiting
     bool forceSend = (currentOscValue == 0 && f.lastReportedValue != 0) ||
                     (currentOscValue == 100 && f.lastReportedValue != 100);
 
@@ -304,12 +341,11 @@ void handleFaders() {
         
         f.setpoint = currentOscValue;
 
-        if (faderDebug) {
-          debugPrintf("Fader %d position update: %d\n", f.oscID, currentOscValue);
-        }
     }
-    }
+
+    f.lastSampledOscValue = currentOscValue;
   }
+}
 
 
 
@@ -332,17 +368,11 @@ int readFadertoOSC(Fader& f) {
 
   // Clamp near-bottom analog values to force OSC = 0
   if (analogValue <= f.minVal + 4) {
-    //if (faderDebug) {
-      //debugPrintf("Fader %d: Clamped to 0 (analog=%d, minVal=%d)\n", f.oscID, analogValue, f.minVal);
-    //}
     return 0;
   }
 
   // Clamp near-top analog values to force OSC = 100
   if (analogValue >= f.maxVal - 4) {
-    //if (faderDebug) {
-      //debugPrintf("Fader %d: Clamped to 100 (analog=%d, maxVal=%d)\n", f.oscID, analogValue, f.maxVal);
-    //}
     return 100;
   }
 
@@ -363,8 +393,8 @@ void sendFaderOsc(Fader& f, int value, bool force) {
     char oscAddress[32];
     snprintf(oscAddress, sizeof(oscAddress), "/Page%d/Fader%d", currentOSCPage, f.oscID);
     
-    debugPrintf("Sending OSC update for Fader %d on Page %d → value: %d\n", f.oscID, currentOSCPage, value);
-    
+    FADER_POS_DEBUG_PRINTF("Sent Fader %d -> %d", f.oscID, value);
+
     sendOscMessage(oscAddress, ",i", &value);
     
     f.lastOscSendTime = now;
@@ -387,9 +417,7 @@ int getFaderIndexFromID(int id) {
 void checkFaderRetry() {
   if (FaderRetryPending && millis() >= FaderRetryTime) {
     FaderRetryPending = false;
-    if (faderDebug) {
-      debugPrint("Retrying fader movement...");
-    }
+    FADER_ERROR_PRINT("Retrying fader movement...");
     moveAllFadersToSetpoints();
   }
 }

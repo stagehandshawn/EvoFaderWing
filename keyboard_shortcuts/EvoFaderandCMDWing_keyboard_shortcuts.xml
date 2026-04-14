@@ -73,7 +73,7 @@
         <KeyboardShortcut Lock="Yes" KeyCode="EXEC" ExecutorIndex="302" Shortcut="W" />
         <KeyboardShortcut Lock="Yes" KeyCode="EXEC" ExecutorIndex="303" Shortcut="E" />
         <KeyboardShortcut Lock="Yes" KeyCode="EXEC" ExecutorIndex="304" Shortcut="R" />
-        <KeyboardShortcut Lock="Yes" KeyCode="EXEC" ExecutorIndex="305" Shortcut="T" />
+        <KeyboardShortcut Lock="Yes" KeyCode="EXEC" ExecutorIndex="305" Shortcut="Equal" />
         <KeyboardShortcut Lock="Yes" KeyCode="EXEC" ExecutorIndex="306" Shortcut="Y" />
         <KeyboardShortcut Lock="Yes" KeyCode="EXEC" ExecutorIndex="307" Shortcut="U" />
         <KeyboardShortcut Lock="Yes" KeyCode="EXEC" ExecutorIndex="308" Shortcut="I" />
@@ -168,7 +168,7 @@
         <!-- ===== OPERATOR KEYS ===== -->
         <KeyboardShortcut Lock="Yes" KeyCode="PLUS" Shortcut="Alt+Equal" />
         <KeyboardShortcut Lock="Yes" KeyCode="MINUS" Shortcut="Minus" />
-        <KeyboardShortcut Lock="Yes" KeyCode="THRU" Shortcut="Alt+T" />
+        <KeyboardShortcut Lock="Yes" KeyCode="THRU" Shortcut="T" />
         <KeyboardShortcut Lock="Yes" KeyCode="DOT" Shortcut="Ctrl+Period" />
         <KeyboardShortcut Lock="Yes" KeyCode="DOT" Shortcut="kpDecimal" />
         <KeyboardShortcut Lock="Yes" KeyCode="IF" Shortcut="Alt+8" />

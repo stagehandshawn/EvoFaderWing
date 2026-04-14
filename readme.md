@@ -97,21 +97,42 @@ There is a Python script and a `tasks.json` for uploading code automatically for
 
 The Lua script `/lua/EvoFaderWingOSC.lua` will poll executors and send updates to the FaderWing using bundled OSC messages, and the FaderWing will send OSC back to the script.
 
-- You will need to create 2 OSC connections
-  - The first will be for incoming messages and will be set to recieve.
-  - The second will be from outgoing messages and will be set to send.
-  - Both will need to be set to a fader range of 100
+- You will need to create 1 OSC connection
+  - Name the Osc entry EvoFaderWing
+  - Enter the IP Address of EvoFaderWing
+  - Set Recieve and Send Command to Yes
+  - Make sure to enter the IP Address of grandMA3 into the OSC settings of EvoFaderWing
 
 ![OscSettings](https://raw.githubusercontent.com/stagehandshawn/EvoFaderWing/main/docs/OscSettings.png)
 
 ## Web GUI
 - Network Setup
 
-![NetowrkSetup](https://raw.githubusercontent.com/stagehandshawn/EvoFaderWing/main/docs/evofaderwing_webgui_network.png)
+![NetowrkSetup](https://raw.githubusercontent.com/stagehandshawn/EvoFaderWing/main/docs/webgui/webgui_network.png)
 
 - OSC Setup
 
-![OscSetup](https://raw.githubusercontent.com/stagehandshawn/EvoFaderWing/main/docs/evofaderwing_webgui_osc.png)
+![OscSetup](https://raw.githubusercontent.com/stagehandshawn/EvoFaderWing/main/docs/webgui/webgui_osc.png)
+
+- Faders
+
+![faders1](https://raw.githubusercontent.com/stagehandshawn/EvoFaderWing/main/docs/webgui/webgui_faders1.png)
+
+![faders2](https://raw.githubusercontent.com/stagehandshawn/EvoFaderWing/main/docs/webgui/webgui_faders2.png)
+
+- Led Settings
+
+![leds](https://raw.githubusercontent.com/stagehandshawn/EvoFaderWing/main/docs/webgui/webgui_leds.png)
+
+- Fader Stats
+
+![stats](https://raw.githubusercontent.com/stagehandshawn/EvoFaderWing/main/docs/webgui/webgui_stats.png)
+
+- Debug Settings
+
+![debug1](https://raw.githubusercontent.com/stagehandshawn/EvoFaderWing/main/docs/webgui/webgui_debug1.png)
+
+![debug2](https://raw.githubusercontent.com/stagehandshawn/EvoFaderWing/main/docs/webgui/webgui_debug2.png)
 
 ## For a complete setup add [EvoCmdWing](https://github.com/stagehandshawn/EvoCmdWing)
 ![evocmdfaderwing](https://github.com/stagehandshawn/EvoFaderWing/blob/main/docs/gallery/faderwing_cmdwing.png?raw=true)

@@ -4,6 +4,7 @@
 #include "Utils.h"
 #include "Config.h"
 #include <stdarg.h>
+#include <string.h>
 
 extern OLED display;
 
@@ -11,28 +12,111 @@ extern OLED display;
 // DEBUG FUNCTIONS
 //================================
 
-void debugPrint(const char* message) {
-  if (debugMode) {
-    Serial.println(message);
+static bool isValidDebugLevel(uint8_t value) {
+  return value == DBG_OFF || value == DBG_ERROR || value == DBG_DEBUG;
+}
+
+static const char* debugChannelPrefix(DebugChannel channel) {
+  switch (channel) {
+    case DBG_CH_SYSTEM: return "[SYSTEM]";
+    case DBG_CH_WEB: return "[WEB]";
+    case DBG_CH_NETWORK: return "[NETWORK]";
+    case DBG_CH_OSC: return "[OSC]";
+    case DBG_CH_I2C_BUS: return "[I2C BUS]";
+    case DBG_CH_FADER_CORE: return "[FADER]";
+    case DBG_CH_FADER_POSITION: return "[FADER POS]";
+    case DBG_CH_TOUCH_CORE: return "[TOUCH]";
+    case DBG_CH_TOUCH_RAW: return "[TOUCH RAW]";
+    case DBG_CH_CALIBRATION: return "[CAL]";
+    case DBG_CH_EEPROM: return "[EEPROM]";
+    case DBG_CH_LED_EXEC: return "[LED EXEC]";
+    case DBG_CH_OLED: return "[OLED]";
+    default: return "[LOG]";
   }
 }
 
-void debugPrintf(const char* format, ...) {
-  if (debugMode) {
-    char buffer[128];
-    va_list args;
-    va_start(args, format);
-    vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
-    
-    // Check if the format string already ends with a newline
-    size_t len = strlen(format);
-    if (len > 0 && format[len-1] == '\n') {
-      Serial.print(buffer); // Already has newline
-    } else {
-      Serial.println(buffer); // Add newline
-    }
+static bool startsWithExplicitPrefix(const char* text) {
+  if (text == nullptr) {
+    return false;
   }
+  const char* p = text;
+  while (*p == ' ' || *p == '\t') {
+    ++p;
+  }
+  return *p == '[';
+}
+
+bool debugEnabled(DebugChannel channel, DebugLevel needLevel) {
+  if (!debugMode || !Fconfig.serialDebug) {
+    return false;
+  }
+  if ((uint8_t)channel >= DBG_CH_COUNT) {
+    return false;
+  }
+  if ((uint8_t)needLevel > (uint8_t)DBG_DEBUG) {
+    return false;
+  }
+
+  uint8_t configured = Fconfig.debugLevel[(uint8_t)channel];
+  if (!isValidDebugLevel(configured)) {
+    configured = DBG_ERROR;
+  }
+
+  return configured >= (uint8_t)needLevel;
+}
+
+static void debugVLog(DebugChannel channel, DebugLevel level, const char* format, va_list args) {
+  if (format == nullptr) {
+    return;
+  }
+  if (!debugEnabled(channel, level)) {
+    return;
+  }
+
+  char buffer[192];
+  vsnprintf(buffer, sizeof(buffer), format, args);
+
+  const bool hasExplicitPrefix = startsWithExplicitPrefix(buffer);
+  const char* prefix = debugChannelPrefix(channel);
+  size_t bufferLen = strlen(buffer);
+  bool hasTrailingNewline = (bufferLen > 0 && buffer[bufferLen - 1] == '\n');
+
+  if (hasExplicitPrefix) {
+    if (hasTrailingNewline) {
+      Serial.print(buffer);
+    } else {
+      Serial.println(buffer);
+    }
+    return;
+  }
+
+  if (hasTrailingNewline) {
+    Serial.print(prefix);
+    Serial.print(" ");
+    Serial.print(buffer);
+  } else {
+    Serial.print(prefix);
+    Serial.print(" ");
+    Serial.println(buffer);
+  }
+}
+
+void debugLog(DebugChannel channel, DebugLevel level, const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  debugVLog(channel, level, format, args);
+  va_end(args);
+}
+
+void debugPrint(const char* message) {
+  debugLog(DBG_CH_SYSTEM, DBG_DEBUG, "%s", message ? message : "");
+}
+
+void debugPrintf(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  debugVLog(DBG_CH_SYSTEM, DBG_DEBUG, format, args);
+  va_end(args);
 }
 
 //================================
@@ -55,7 +139,7 @@ IPAddress stringToIP(const String &str) {
 // WEB PARAMETER PARSING
 //================================
 
-String getParam(String data, const char* key) {
+String getParam(const String& data, const char* key) {
   int start = data.indexOf(String(key) + "=");
   if (start == -1) return "";
   start += strlen(key) + 1;

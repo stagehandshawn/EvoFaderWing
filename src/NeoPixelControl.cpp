@@ -3,11 +3,9 @@
 #include "NeoPixelControl.h"
 #include "Utils.h"
 #include "FaderControl.h"
+#include "KeyLedControl.h"
 #include <stdint.h>  // or <cstdint>
 #include <cmath>
-
-//NeoPixel Debug print
-bool neoPixelDebug = false;
 
 //================================
 // GLOBAL NEOPIXEL OBJECT
@@ -63,12 +61,7 @@ void updateNeoPixels() {
     uint32_t color = getScaledColor(f);
     bool needsUpdate = false;
 
-    if (neoPixelDebug && f.currentBrightness != f.lastReportedBrightness) {
-      uint8_t r = (f.red * f.currentBrightness) / 255;
-      uint8_t g = (f.green * f.currentBrightness) / 255;
-      uint8_t b = (f.blue * f.currentBrightness) / 255;
-      debugPrintf("Fader %d RGB → R=%d G=%d B=%d (Brightness=%d)",
-                  i, r, g, b, f.currentBrightness);
+    if (f.currentBrightness != f.lastReportedBrightness) {
       f.lastReportedBrightness = f.currentBrightness;
     }
 
@@ -113,6 +106,13 @@ void updateNeoPixels() {
   }
 }
 
+void invalidateNeoPixelRenderCache() {
+  for (int i = 0; i < NUM_FADERS; i++) {
+    faders[i].lastRenderedColor = 0xFFFFFFFF;
+    faders[i].lastRenderedSetpoint = 255;
+  }
+}
+
 void updateBrightnessOnFaderTouchChange() {
   static bool previousTouch[NUM_FADERS] = { false };
 
@@ -123,12 +123,6 @@ void updateBrightnessOnFaderTouchChange() {
     if (currentTouch != previousTouch[i]) {
       f.brightnessStartTime = millis();
       f.targetBrightness = currentTouch ? Fconfig.touchedBrightness : Fconfig.baseBrightness;
-
-      if (neoPixelDebug){
-          debugPrintf("Fader %d → Touch %s → Brightness target = %d", i,
-                  currentTouch ? "TOUCHED" : "released",
-                  f.targetBrightness);
-      }
 
       previousTouch[i] = currentTouch;
     }
@@ -148,9 +142,6 @@ void updateBaseBrightnessPixels() {
       // Optionally, set currentBrightness directly if no fade desired:
       // f.currentBrightness = Fconfig.baseBrightness;
 
-      if (neoPixelDebug) {
-        debugPrintf("Fader %d base brightness updated to %d", i, Fconfig.baseBrightness);
-      }
     }
   }
 }
@@ -218,6 +209,7 @@ void fadeSequence(unsigned long STAGGER_DELAY, unsigned long COLOR_CYCLE_TIME) {
   unsigned long startTime = millis();
   bool animationComplete = false;
   uint8_t originalColors[NUM_FADERS][3];
+  uint8_t startupColors10[NUM_FADERS][3];
   
   // Start all faders at black (0,0,0) with zero brightness
   for (int i = 0; i < NUM_FADERS; i++) {
@@ -323,12 +315,17 @@ void fadeSequence(unsigned long STAGGER_DELAY, unsigned long COLOR_CYCLE_TIME) {
     
     // Update the pixels with the calculated colors and brightness
     for (int i = 0; i < NUM_FADERS; i++) {
+      startupColors10[i][0] = faders[i].red;
+      startupColors10[i][1] = faders[i].green;
+      startupColors10[i][2] = faders[i].blue;
+
       uint32_t color = getScaledColor(faders[i]);
       for (int j = 0; j < PIXELS_PER_FADER; j++) {
         pixels.setPixelColor(i * PIXELS_PER_FADER + j, color);
       }
     }
     pixels.show();
+    showExecutorStartupFromFaderColors(startupColors10);
     
     delay(10);
   }
@@ -340,6 +337,9 @@ void fadeSequence(unsigned long STAGGER_DELAY, unsigned long COLOR_CYCLE_TIME) {
     faders[i].green = originalColors[i][1];
     faders[i].blue = originalColors[i][2];
   }
+
+  markKeyLedsDirty();
+  updateKeyLeds();
 }
 
 void flashAllFadersRed() {

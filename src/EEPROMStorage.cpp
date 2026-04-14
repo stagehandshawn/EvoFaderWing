@@ -6,8 +6,40 @@
 #include <EEPROM.h>
 #include "FaderControl.h"
 #include "NetworkOSC.h"
+#include "NetworkManager.h"
 #include "NeoPixelControl.h"
 #include "KeyLedControl.h"
+#include <string.h>
+
+namespace {
+
+static void resetDebugConfigToDefaults() {
+  Fconfig.debugConfigVersion = DEBUG_CONFIG_VERSION;
+  loadDefaultDebugLevels(Fconfig.debugLevel, DEBUG_CHANNEL_COUNT);
+}
+
+static uint8_t normalizeStoredDebugLevel(uint8_t value, uint8_t defaultValue) {
+  if (value == DBG_OFF || value == DBG_ERROR || value == DBG_DEBUG) {
+    return value;
+  }
+  return defaultValue;
+}
+
+static void normalizeDebugConfig() {
+  uint8_t defaults[DEBUG_CHANNEL_COUNT] = {};
+  loadDefaultDebugLevels(defaults, DEBUG_CHANNEL_COUNT);
+
+  if (Fconfig.debugConfigVersion != DEBUG_CONFIG_VERSION) {
+    resetDebugConfigToDefaults();
+    return;
+  }
+
+  for (uint8_t i = 0; i < DEBUG_CHANNEL_COUNT; ++i) {
+    Fconfig.debugLevel[i] = normalizeStoredDebugLevel(Fconfig.debugLevel[i], defaults[i]);
+  }
+}
+
+}  // namespace
 
 //================================
 // CALIBRATION FUNCTIONS
@@ -20,7 +52,7 @@ void saveCalibration() {
     EEPROM.put(addr, faders[i].minVal); addr += sizeof(int);
     EEPROM.put(addr, faders[i].maxVal); addr += sizeof(int);
   }
-  debugPrint("Calibration saved.");
+  EEPROM_DEBUG_PRINT("Calibration saved.");
 
 }
 
@@ -29,13 +61,13 @@ void loadCalibration() {
   for (int i = 0; i < NUM_FADERS; i++) {
     EEPROM.get(addr, faders[i].minVal); addr += sizeof(int);
     EEPROM.get(addr, faders[i].maxVal); addr += sizeof(int);
-    debugPrintf("Loaded Fader %d → Min: %d Max: %d\n", i, faders[i].minVal, faders[i].maxVal);
+    EEPROM_DEBUG_PRINTF("Loaded Fader %d -> Min: %d Max: %d", i, faders[i].minVal, faders[i].maxVal);
   }
 }
 
 void checkCalibration() {
   if (EEPROM.read(EEPROM_CAL_SIGNATURE_ADDR) != CALCFG_EEPROM_SIGNATURE) {
-    debugPrint("Running calibration...");
+    CAL_DEBUG_PRINT("Running calibration...");
     calibrateFaders();
 
     saveCalibration();
@@ -57,31 +89,34 @@ void saveFaderConfig() {
   // Write configuration (primitive types only)
   EEPROM.put(EEPROM_CONFIG_DATA_ADDR, Fconfig);
   
-  debugPrint("Fader configuration saved to EEPROM.");
+  EEPROM_DEBUG_PRINT("Fader configuration saved to EEPROM.");
 }
 
 void loadConfig() {
-  // Check signature
-  if (EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR) == FADERCFG_EEPROM_SIGNATURE) {
-    // Load configuration
+  uint8_t signature = EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR);
+
+  if (signature == FADERCFG_EEPROM_SIGNATURE) {
     EEPROM.get(EEPROM_CONFIG_DATA_ADDR, Fconfig);
-    // Normalize booleans in case of stale/garbage values
+  } else {
+    EEPROM_DEBUG_PRINT("No valid fader configuration in EEPROM, using defaults.");
+    resetDebugConfigToDefaults();
+  }
+
+  if (signature == FADERCFG_EEPROM_SIGNATURE) {
     Fconfig.serialDebug = Fconfig.serialDebug ? true : false;
     Fconfig.sendKeystrokes = Fconfig.sendKeystrokes ? true : false;
     Fconfig.useLevelPixels = Fconfig.useLevelPixels ? true : false;
-    // Clamp slow/fast zones to sane OSC range and ordering
+    Fconfig.allowFaderOscWithoutTouch = Fconfig.allowFaderOscWithoutTouch ? true : false;
     if (Fconfig.slowZone > 100) Fconfig.slowZone = 100;
     if (Fconfig.fastZone > 100) Fconfig.fastZone = 100;
     if (Fconfig.fastZone <= Fconfig.slowZone) {
-      // reset to defaults if inverted or identical
       Fconfig.slowZone = SLOW_ZONE;
       Fconfig.fastZone = FAST_ZONE;
     }
-    debugPrint("Fader configuration loaded from EEPROM.");
-  } else {
-    debugPrint("No valid fader configuration in EEPROM, using defaults.");
-    // Default config values already set in the struct initialization
+    normalizeDebugConfig();
+    EEPROM_DEBUG_PRINT("Fader configuration loaded from EEPROM.");
   }
+
   debugMode = Fconfig.serialDebug;
 }
 
@@ -103,52 +138,22 @@ void saveNetworkConfig() {
   // Send-to IP
   for (int i = 0; i < 4; i++) EEPROM.write(addr++, netConfig.sendToIP[i]);
  
-  // Ports
-  EEPROM.put(addr, netConfig.receivePort); addr += sizeof(uint16_t);
-  EEPROM.put(addr, netConfig.sendPort);    addr += sizeof(uint16_t);
+  // Shared OSC port
+  EEPROM.put(addr, netConfig.oscPort); addr += sizeof(uint16_t);
  
   // DHCP flag
   EEPROM.write(addr++, netConfig.useDHCP ? 1 : 0);
- 
-  bool configChanged = false;
-  int checkAddr = NETCFG_EEPROM_ADDR + 1; // Skip signature
-  NetworkConfig oldConfig;
 
-  // Load old staticIP
-  for (int i = 0; i < 4; i++) oldConfig.staticIP[i] = EEPROM.read(checkAddr++);
-  // Load old gateway
-  for (int i = 0; i < 4; i++) oldConfig.gateway[i] = EEPROM.read(checkAddr++);
-  // Load old subnet
-  for (int i = 0; i < 4; i++) oldConfig.subnet[i] = EEPROM.read(checkAddr++);
-  // Load old sendToIP
-  for (int i = 0; i < 4; i++) oldConfig.sendToIP[i] = EEPROM.read(checkAddr++);
-  // Load old ports
-  EEPROM.get(checkAddr, oldConfig.receivePort); checkAddr += sizeof(uint16_t);
-  EEPROM.get(checkAddr, oldConfig.sendPort);    checkAddr += sizeof(uint16_t);
-  // Load old DHCP flag
-  oldConfig.useDHCP = EEPROM.read(checkAddr++) ? true : false;
-
-  // Check if any relevant values have changed
-  for (int i = 0; i < 4; i++) {
-    if (oldConfig.staticIP[i] != netConfig.staticIP[i]) configChanged = true;
-    if (oldConfig.gateway[i] != netConfig.gateway[i]) configChanged = true;
-    if (oldConfig.subnet[i] != netConfig.subnet[i]) configChanged = true;
-  }
-  if (oldConfig.useDHCP != netConfig.useDHCP) configChanged = true;
-
-  if (configChanged) {
-    restartUDP();
-    Ethernet.end();
-    setupNetwork();  // includes udp.begin(newReceivePort)
-  }
-
+  networkRequestReconfigure();
   displayIPAddress();
+  EEPROM_DEBUG_PRINT("Network configuration saved to EEPROM.");
 }
  
 bool loadNetworkConfig() {
   int addr = NETCFG_EEPROM_ADDR;
-  if (EEPROM.read(addr++) != NETCFG_EEPROM_SIGNATURE) {
-    debugPrint("No valid network config in EEPROM, using defaults.");
+  uint8_t signature = EEPROM.read(addr++);
+  if (signature != NETCFG_EEPROM_SIGNATURE) {
+    EEPROM_DEBUG_PRINT("No valid network config in EEPROM, using defaults.");
     return false;
   }
  
@@ -157,14 +162,15 @@ bool loadNetworkConfig() {
   for (int i = 0; i < 4; i++) netConfig.gateway[i]  = EEPROM.read(addr++);
   for (int i = 0; i < 4; i++) netConfig.subnet[i]   = EEPROM.read(addr++);
   for (int i = 0; i < 4; i++) netConfig.sendToIP[i] = EEPROM.read(addr++);
- 
-  EEPROM.get(addr, netConfig.receivePort); addr += sizeof(uint16_t);
-  EEPROM.get(addr, netConfig.sendPort);    addr += sizeof(uint16_t);
- 
-  netConfig.useDHCP = EEPROM.read(addr++) ? true : false;
- 
 
-  debugPrint("Network config loaded from EEPROM.");
+  EEPROM.get(addr, netConfig.oscPort); addr += sizeof(uint16_t);
+  netConfig.useDHCP = EEPROM.read(addr++) ? true : false;
+
+  if (netConfig.oscPort == 0) {
+    netConfig.oscPort = kOSCPort;
+  }
+
+  EEPROM_DEBUG_PRINT("Network config loaded from EEPROM.");
   return true;
 }
 
@@ -192,7 +198,7 @@ void saveTouchConfig() {
   // Write configuration
   EEPROM.put(EEPROM_TOUCH_DATA_ADDR, touchConfig);
   
-  debugPrint("Touch sensor configuration saved to EEPROM.");
+  EEPROM_DEBUG_PRINT("Touch sensor configuration saved to EEPROM.");
 
 }
 
@@ -239,15 +245,15 @@ void loadTouchConfig() {
     touchThreshold = normalizedTouchThreshold;
     releaseThreshold = normalizedReleaseThreshold;
     
-    debugPrint("Touch sensor configuration loaded from EEPROM.");
+    EEPROM_DEBUG_PRINT("Touch sensor configuration loaded from EEPROM.");
     if (normalized) {
-      debugPrint("Touch config normalized for active touch controller.");
+      TOUCH_DEBUG_PRINT("Touch config normalized for active touch controller.");
     }
     
     // Apply loaded settings to the sensor (no calibration here; run separately after faders are parked)
     setAutoTouchCalibration(autoCalibrationMode);
   } else {
-    debugPrint("No valid touch configuration in EEPROM, using defaults.");
+    EEPROM_DEBUG_PRINT("No valid touch configuration in EEPROM, using defaults.");
   }
 }
 
@@ -258,12 +264,12 @@ void loadTouchConfig() {
 void saveExecConfig() {
   EEPROM.write(EEPROM_EXEC_SIGNATURE_ADDR, EXECCFG_EEPROM_SIGNATURE);
   EEPROM.put(EEPROM_EXEC_DATA_ADDR, execConfig);
-  debugPrint("Executor LED configuration saved to EEPROM.");
+  EEPROM_DEBUG_PRINT("Executor LED configuration saved to EEPROM.");
 }
 
 bool loadExecConfig() {
   if (EEPROM.read(EEPROM_EXEC_SIGNATURE_ADDR) != EXECCFG_EEPROM_SIGNATURE) {
-    debugPrint("No valid executor LED configuration in EEPROM, using defaults.");
+    EEPROM_DEBUG_PRINT("No valid executor LED configuration in EEPROM, using defaults.");
     return false;
   }
 
@@ -280,7 +286,7 @@ bool loadExecConfig() {
   execConfig.reserved[1] = 0;
 
   markKeyLedsDirty();
-  debugPrint("Executor LED configuration loaded from EEPROM.");
+  EEPROM_DEBUG_PRINT("Executor LED configuration loaded from EEPROM.");
   return true;
 }
 
@@ -325,6 +331,8 @@ void resetToDefaults() {
   Fconfig.serialDebug = false;
   Fconfig.sendKeystrokes = false;
   Fconfig.useLevelPixels = false;
+  Fconfig.allowFaderOscWithoutTouch = true;
+  resetDebugConfigToDefaults();
 
   // Reset executor LED settings
   execConfig.baseBrightness = EXECUTOR_BASE_BRIGHTNESS;
@@ -343,8 +351,7 @@ void resetToDefaults() {
   netConfig.gateway = IPAddress(192, 168, 0, 1);
   netConfig.subnet = IPAddress(255, 255, 255, 0);
   netConfig.sendToIP = IPAddress(192, 168, 0, 10);
-  netConfig.receivePort = 8000;
-  netConfig.sendPort = 9000;
+  netConfig.oscPort = kOSCPort;
 
   
   // Reset touch settings
@@ -367,7 +374,7 @@ void resetToDefaults() {
   saveAllConfig();
 
   markKeyLedsDirty();
-  debugPrint("All settings reset to defaults");
+  SYSTEM_DEBUG_PRINT("All settings reset to defaults");
 }
 
 void resetNetworkDefaults() {
@@ -376,9 +383,8 @@ void resetNetworkDefaults() {
   netConfig.staticIP = IPAddress(192, 168, 0, 169);
   netConfig.gateway = IPAddress(192, 168, 0, 1);
   netConfig.subnet = IPAddress(255, 255, 255, 0);
-  netConfig.sendToIP = IPAddress(192, 168, 0, 100);
-  netConfig.receivePort = 8000;
-  netConfig.sendPort = 9000;
+  netConfig.sendToIP = IPAddress(192, 168, 0, 10);
+  netConfig.oscPort = kOSCPort;
   
   // Save to EEPROM
   saveNetworkConfig();
@@ -389,7 +395,7 @@ void resetNetworkDefaults() {
   
    displayIPAddress();
 
-  debugPrint("Network settings reset to defaults");
+  NETWORK_DEBUG_PRINT("Network settings reset to defaults");
 }
 
 //================================
@@ -397,61 +403,72 @@ void resetNetworkDefaults() {
 //================================
 
 void dumpEepromConfig() {
-
   bool currentDebugMode = debugMode;
+  bool currentSerialDebug = Fconfig.serialDebug;
+  uint8_t currentLevels[DEBUG_CHANNEL_COUNT] = {};
+  memcpy(currentLevels, Fconfig.debugLevel, sizeof(currentLevels));
 
   debugMode = true;
+  Fconfig.serialDebug = true;
+  for (uint8_t i = 0; i < DEBUG_CHANNEL_COUNT; ++i) {
+    Fconfig.debugLevel[i] = DBG_DEBUG;
+  }
 
-  debugPrint("\n===== EEPROM CONFIGURATION DUMP =====\n");
+  EEPROM_DEBUG_PRINT("\n===== EEPROM CONFIGURATION DUMP =====\n");
   
   // Check calibration data
-  debugPrint("\n--- Fader Calibration ---");
+  EEPROM_DEBUG_PRINT("\n--- Fader Calibration ---");
   if (EEPROM.read(EEPROM_CAL_SIGNATURE_ADDR) == CALCFG_EEPROM_SIGNATURE) {
-    debugPrint("Calibration data is valid");
+    EEPROM_DEBUG_PRINT("Calibration data is valid");
     
     int addr = EEPROM_CAL_DATA_ADDR;
     for (int i = 0; i < NUM_FADERS; i++) {
       int minVal, maxVal;
       EEPROM.get(addr, minVal); addr += sizeof(int);
       EEPROM.get(addr, maxVal); addr += sizeof(int);
-      debugPrintf("Fader %d: Min=%d, Max=%d, Range=%d\n", 
-                 i, minVal, maxVal, maxVal - minVal);
+      EEPROM_DEBUG_PRINTF("Fader %d: Min=%d, Max=%d, Range=%d", i, minVal, maxVal, maxVal - minVal);
     }
   } else {
-    debugPrintf("Calibration data not found (signature=0x%02X, expected=0x%02X)\n", 
-               EEPROM.read(EEPROM_CAL_SIGNATURE_ADDR), CALCFG_EEPROM_SIGNATURE);
+    EEPROM_ERROR_PRINTF("Calibration data not found (signature=0x%02X, expected=0x%02X)",
+                        EEPROM.read(EEPROM_CAL_SIGNATURE_ADDR), CALCFG_EEPROM_SIGNATURE);
   }
   
   // Check fader configuration
-  debugPrint("\n--- Fader Configuration ---");
-  if (EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR) == FADERCFG_EEPROM_SIGNATURE) {
-    debugPrint("Fader configuration is valid");
-    
+  EEPROM_DEBUG_PRINT("\n--- Fader Configuration ---");
+  uint8_t faderSignature = EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR);
+  if (faderSignature == FADERCFG_EEPROM_SIGNATURE) {
+    EEPROM_DEBUG_PRINT("Fader configuration is valid");
+
     FaderConfig storedConfig;
     EEPROM.get(EEPROM_CONFIG_DATA_ADDR, storedConfig);
-    
-    debugPrintf("Min PWM: %d\n", storedConfig.minPwm);
-    debugPrintf("Default PWM: %d\n", storedConfig.maxPwm);
-    debugPrintf("Calibration PWM: %d\n", storedConfig.calibratePwm);
-    debugPrintf("Target Tolerance: %d\n", storedConfig.targetTolerance);
-    debugPrintf("Send Tolerance: %d\n", storedConfig.sendTolerance);
-    debugPrintf("Slow Zone: %d\n", storedConfig.slowZone);
-    debugPrintf("Fast Zone: %d\n", storedConfig.fastZone);
-    debugPrintf("Base Brightness: %d\n", storedConfig.baseBrightness);
-    debugPrintf("Touched Brightness: %d\n", storedConfig.touchedBrightness);
-    debugPrintf("Fade Time (ms): %d\n", storedConfig.fadeTime);
-    debugPrintf("Serial Debug: %s\n", storedConfig.serialDebug ? "Enabled" : "Disabled");
-    debugPrintf("Send Keystrokes: %s\n", storedConfig.sendKeystrokes ? "Enabled" : "Disabled");
-    
+
+    EEPROM_DEBUG_PRINTF("Min PWM: %d", storedConfig.minPwm);
+    EEPROM_DEBUG_PRINTF("Default PWM: %d", storedConfig.maxPwm);
+    EEPROM_DEBUG_PRINTF("Calibration PWM: %d", storedConfig.calibratePwm);
+    EEPROM_DEBUG_PRINTF("Target Tolerance: %d", storedConfig.targetTolerance);
+    EEPROM_DEBUG_PRINTF("Send Tolerance: %d", storedConfig.sendTolerance);
+    EEPROM_DEBUG_PRINTF("Slow Zone: %d", storedConfig.slowZone);
+    EEPROM_DEBUG_PRINTF("Fast Zone: %d", storedConfig.fastZone);
+    EEPROM_DEBUG_PRINTF("Base Brightness: %d", storedConfig.baseBrightness);
+    EEPROM_DEBUG_PRINTF("Touched Brightness: %d", storedConfig.touchedBrightness);
+    EEPROM_DEBUG_PRINTF("Fade Time (ms): %lu", storedConfig.fadeTime);
+    EEPROM_DEBUG_PRINTF("Serial Debug: %s", storedConfig.serialDebug ? "Enabled" : "Disabled");
+    EEPROM_DEBUG_PRINTF("Send Keystrokes: %s", storedConfig.sendKeystrokes ? "Enabled" : "Disabled");
+    EEPROM_DEBUG_PRINTF("Allow OSC Without Touch: %s", storedConfig.allowFaderOscWithoutTouch ? "Enabled" : "Disabled");
+    EEPROM_DEBUG_PRINTF("Debug Config Version: %u", storedConfig.debugConfigVersion);
+    for (uint8_t i = 0; i < DEBUG_CHANNEL_COUNT; ++i) {
+      EEPROM_DEBUG_PRINTF("Debug Channel %-14s: %u", debugChannelName(static_cast<DebugChannel>(i)), storedConfig.debugLevel[i]);
+    }
   } else {
-    debugPrintf("Fader config not found (signature=0x%02X, expected=0x%02X)\n", 
-               EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR), FADERCFG_EEPROM_SIGNATURE);
+    EEPROM_ERROR_PRINTF("Fader config not found (signature=0x%02X, expected=0x%02X)",
+                        EEPROM.read(EEPROM_CONFIG_SIGNATURE_ADDR), FADERCFG_EEPROM_SIGNATURE);
   }
   
   // Check network configuration
-  debugPrint("\n--- Network Configuration ---");
-  if (EEPROM.read(NETCFG_EEPROM_ADDR) == NETCFG_EEPROM_SIGNATURE) {
-    debugPrint("Network configuration is valid");
+  EEPROM_DEBUG_PRINT("\n--- Network Configuration ---");
+  uint8_t networkSignature = EEPROM.read(NETCFG_EEPROM_ADDR);
+  if (networkSignature == NETCFG_EEPROM_SIGNATURE) {
+    EEPROM_DEBUG_PRINT("Network configuration is valid");
     
     // Read network config manually from EEPROM
     int addr = NETCFG_EEPROM_ADDR + 1; // Skip signature
@@ -462,61 +479,60 @@ void dumpEepromConfig() {
     for (int i = 0; i < 4; i++) subnet[i] = EEPROM.read(addr++);
     for (int i = 0; i < 4; i++) sendToIP[i] = EEPROM.read(addr++);
     
-    uint16_t receivePort, sendPort;
-    EEPROM.get(addr, receivePort); addr += sizeof(uint16_t);
-    EEPROM.get(addr, sendPort); addr += sizeof(uint16_t);
-    
+    uint16_t oscPort = kOSCPort;
+    EEPROM.get(addr, oscPort); addr += sizeof(uint16_t);
     bool useDHCP = EEPROM.read(addr) ? true : false;
     
-    debugPrintf("Use DHCP: %s\n", useDHCP ? "Yes" : "No");
-    debugPrintf("Static IP: %d.%d.%d.%d\n", staticIP[0], staticIP[1], staticIP[2], staticIP[3]);
-    debugPrintf("Gateway: %d.%d.%d.%d\n", gateway[0], gateway[1], gateway[2], gateway[3]);
-    debugPrintf("Subnet: %d.%d.%d.%d\n", subnet[0], subnet[1], subnet[2], subnet[3]);
-    debugPrintf("Send-To IP: %d.%d.%d.%d\n", sendToIP[0], sendToIP[1], sendToIP[2], sendToIP[3]);
-    debugPrintf("Receive Port: %d\n", receivePort);
-    debugPrintf("Send Port: %d\n", sendPort);
+    EEPROM_DEBUG_PRINTF("Use DHCP: %s", useDHCP ? "Yes" : "No");
+    EEPROM_DEBUG_PRINTF("Static IP: %d.%d.%d.%d", staticIP[0], staticIP[1], staticIP[2], staticIP[3]);
+    EEPROM_DEBUG_PRINTF("Gateway: %d.%d.%d.%d", gateway[0], gateway[1], gateway[2], gateway[3]);
+    EEPROM_DEBUG_PRINTF("Subnet: %d.%d.%d.%d", subnet[0], subnet[1], subnet[2], subnet[3]);
+    EEPROM_DEBUG_PRINTF("Send-To IP: %d.%d.%d.%d", sendToIP[0], sendToIP[1], sendToIP[2], sendToIP[3]);
+    EEPROM_DEBUG_PRINTF("OSC Port: %d", oscPort);
   } else {
-    debugPrintf("Network config not found (signature=0x%02X, expected=0x%02X)\n",
-               EEPROM.read(NETCFG_EEPROM_ADDR), NETCFG_EEPROM_SIGNATURE);
+    EEPROM_ERROR_PRINTF("Network config not found (signature=0x%02X, expected=0x%02X)",
+                        EEPROM.read(NETCFG_EEPROM_ADDR), NETCFG_EEPROM_SIGNATURE);
   }
   
   // Check touch configuration
-  debugPrint("\n--- Touch Sensor Configuration ---");
+  EEPROM_DEBUG_PRINT("\n--- Touch Sensor Configuration ---");
   if (EEPROM.read(EEPROM_TOUCH_SIGNATURE_ADDR) == TOUCHCFG_EEPROM_SIGNATURE) {
-    debugPrint("Touch sensor configuration is valid");
+    EEPROM_DEBUG_PRINT("Touch sensor configuration is valid");
     
     TouchConfig touchConfig;
     EEPROM.get(EEPROM_TOUCH_DATA_ADDR, touchConfig);
     
-    debugPrintf("Auto Calibration Mode: %d\n", touchConfig.autoCalibrationMode);
-    debugPrintf("Touch Threshold: %d\n", touchConfig.touchThreshold);
-    debugPrintf("Hysteresis Code: %d\n", touchConfig.releaseThreshold);
+    EEPROM_DEBUG_PRINTF("Auto Calibration Mode: %d", touchConfig.autoCalibrationMode);
+    EEPROM_DEBUG_PRINTF("Touch Threshold: %d", touchConfig.touchThreshold);
+    EEPROM_DEBUG_PRINTF("Hysteresis Code: %d", touchConfig.releaseThreshold);
   } else {
-    debugPrintf("Touch config not found (signature=0x%02X, expected=0x%02X)\n",
-               EEPROM.read(EEPROM_TOUCH_SIGNATURE_ADDR), TOUCHCFG_EEPROM_SIGNATURE);
+    EEPROM_ERROR_PRINTF("Touch config not found (signature=0x%02X, expected=0x%02X)",
+                        EEPROM.read(EEPROM_TOUCH_SIGNATURE_ADDR), TOUCHCFG_EEPROM_SIGNATURE);
   }
 
   // Check executor LED configuration
-  debugPrint("\n--- Executor LED Configuration ---");
+  EEPROM_DEBUG_PRINT("\n--- Executor LED Configuration ---");
   if (EEPROM.read(EEPROM_EXEC_SIGNATURE_ADDR) == EXECCFG_EEPROM_SIGNATURE) {
-    debugPrint("Executor configuration is valid");
+    EEPROM_DEBUG_PRINT("Executor configuration is valid");
 
     ExecConfig storedExec;
     EEPROM.get(EEPROM_EXEC_DATA_ADDR, storedExec);
 
-    debugPrintf("Base Brightness: %d\n", storedExec.baseBrightness);
-    debugPrintf("Active Brightness: %d\n", storedExec.activeBrightness);
-    debugPrintf("Use Static Color: %s\n", storedExec.useStaticColor ? "Yes" : "No");
-    debugPrintf("Static Color: R%d G%d B%d\n", storedExec.staticRed, storedExec.staticGreen, storedExec.staticBlue);
+    EEPROM_DEBUG_PRINTF("Base Brightness: %d", storedExec.baseBrightness);
+    EEPROM_DEBUG_PRINTF("Active Brightness: %d", storedExec.activeBrightness);
+    EEPROM_DEBUG_PRINTF("Use Static Color: %s", storedExec.useStaticColor ? "Yes" : "No");
+    EEPROM_DEBUG_PRINTF("Static Color: R%d G%d B%d", storedExec.staticRed, storedExec.staticGreen, storedExec.staticBlue);
   } else {
-    debugPrintf("Executor config not found (signature=0x%02X, expected=0x%02X)\n",
-               EEPROM.read(EEPROM_EXEC_SIGNATURE_ADDR), EXECCFG_EEPROM_SIGNATURE);
+    EEPROM_ERROR_PRINTF("Executor config not found (signature=0x%02X, expected=0x%02X)",
+                        EEPROM.read(EEPROM_EXEC_SIGNATURE_ADDR), EXECCFG_EEPROM_SIGNATURE);
   }
 
   
-  debugPrint("\n===== END OF EEPROM DUMP =====\n");
+  EEPROM_DEBUG_PRINT("\n===== END OF EEPROM DUMP =====\n");
 
   debugMode = currentDebugMode;
+  Fconfig.serialDebug = currentSerialDebug;
+  memcpy(Fconfig.debugLevel, currentLevels, sizeof(currentLevels));
 
   displayIPAddress();
 

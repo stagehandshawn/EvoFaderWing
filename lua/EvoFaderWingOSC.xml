@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<GMA3 DataVersion="1.9.7.0">
-    <UserPlugin Name="EvoFaderWingOSC" Author="ShawnR" Version="0.3" Path="/EvoFaderWingOSC">
-        <ComponentLua Name="Main" Filename="EvoFaderWingOSC.lua"/>
-    </UserPlugin>
-</GMA3>

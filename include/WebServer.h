@@ -40,7 +40,9 @@ void handleFaderSettings(String request);
 void handleLEDSettingsSave(String request);
 void handleTouchSettings(String request);
 void handleRunCalibration();
+void handleEnableDisabledFaders();
 void handleDebugToggle(String requestBody);
+void handleDebugSettings(String request);
 void handleResetDefaults();
 void handleNetworkReset();
 
@@ -51,6 +53,7 @@ void handleStatsData();
 void handleFaderSettingsPage();
 void handleLEDSettingsPage();
 void handleOSCSettingsPage();
+void handleDebugSettingsPage();
 
 void sendCommonStyles();
 void sendNavigationHeader(const char* pageTitle);

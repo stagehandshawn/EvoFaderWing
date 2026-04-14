@@ -11,6 +11,7 @@
 #include "EEPROMStorage.h"
 #include "TouchSensor.h"
 #include "NetworkOSC.h"
+#include "NetworkManager.h"
 #include "FaderControl.h"
 #include "NeoPixelControl.h"
 #include "WebServer.h"
@@ -27,20 +28,18 @@ using qindesign::osc::LiteOSCParser;
 unsigned long lastI2CPollTime = 0;     // Time of last I2C poll cycle
 
 OLED display;             // define display 
-IPAddress currentIP;      // define currentIP
-
 //================================
 // MAIN ARDUINO FUNCTIONS
 //================================
 
 void setup() {
-  // Start up keyboard first to make sure of enum in windows
+  // Start the keyboard interface early so the USB device enumerates consistently on Windows
   initKeyboard();
 
   Serial.begin(SERIAL_BAUD);
   while (!Serial && millis() < 4000) {}
   
-  debugPrint("EvoFaderWing init...");
+  SYSTEM_DEBUG_PRINT("EvoFaderWing init...");
 
   // Initialize faders
   initializeFaders();
@@ -48,7 +47,7 @@ void setup() {
   
   // Initialize touch sensor (MTCH2120)
   if (!setupTouch()) {
-    debugPrint("Touch sensor init failed!");
+    TOUCH_ERROR_PRINT("Touch sensor init failed!");
   }
 
   // Start NeoPixels
@@ -71,29 +70,37 @@ void setup() {
   // Setup OLED before network to watch for no dhcp server and know were booting
   display.setupOLED();
 
-  // Set up network connection
-  setupNetwork();
-
-  displayIPAddress();
+  // Set up network manager and network-facing services
+  initNetworkManager();
 
   // Start web server for configuration
   startWebServer();
 
-  fadeSequence(50,1000); // Cool effect so we know we are booted up
+  fadeSequence(50,1000); // Startup indication after initialization completes
 
   //Network reset check
   resetCheckStartTime = millis();
 
-  debugPrint("Initialization complete");
+  SYSTEM_DEBUG_PRINT("Initialization complete");
 
 }
 
 void loop() {
+  Ethernet.loop();
+
+  static unsigned long lastNetworkServiceMs = 0;
+  const unsigned long now = millis();
+  const unsigned long networkServiceIntervalMs = networkIsConnected() ? 100UL : 50UL;
+  if (now - lastNetworkServiceMs >= networkServiceIntervalMs) {
+    lastNetworkServiceMs = now;
+    serviceNetwork();
+  }
+
   // Network reset check exiry PRESS 401 5 times during this time for network reset
 
   if (checkForReset && (millis() - resetCheckStartTime > 5000)) {
     checkForReset = false;
-    debugPrint("[RESET] Reset check window expired.");
+    SYSTEM_DEBUG_PRINT("[RESET] Reset check window expired.");
   }
   
   checkFaderRetry();  // Check for hung fader
@@ -117,7 +124,7 @@ void loop() {
 
   // Handle touch sensor errors, no longer needed used for debugging
   if (hasTouchError()) {
-    debugPrint(getLastTouchError().c_str());
+    TOUCH_ERROR_PRINT(getLastTouchError().c_str());
     clearTouchError();
   }
   
@@ -134,9 +141,7 @@ void loop() {
 // oled display functions
 
 void displayIPAddress(){
-  currentIP = Ethernet.localIP();
-  display.showIPAddress(currentIP,netConfig.receivePort,netConfig.sendToIP,netConfig.sendPort);
-
+  display.showIPAddress(networkGetLocalIP(), netConfig.oscPort, netConfig.sendToIP);
 }
 
 void displayShowResetHeader(){

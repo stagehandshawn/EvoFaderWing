@@ -2,17 +2,7 @@
 #include "Keysend.h"
 #include <Keyboard.h>
 
-// Does not include modifier keys as this can be problematic for holding exec keys
-// May put allowing modifier keys on the roadmap for later though
 
-// Structure to hold key mapping
-struct KeyMapping {
-    int executorIndex;
-    int keyCode;
-    const char* keyName;
-};
-
-// Key mappings based on your XML
 // Using Teensy keyboard codes
 const KeyMapping keyMap[] = {
     // Row 1 (101-110)
@@ -44,7 +34,7 @@ const KeyMapping keyMap[] = {
     {302, 'w', "W"},
     {303, 'e', "E"},
     {304, 'r', "R"},
-    {305, 't', "T"},
+    {305, '=', "Equal"},
     {306, 'y', "Y"},
     {307, 'u', "U"},
     {308, 'i', "I"},
@@ -52,8 +42,7 @@ const KeyMapping keyMap[] = {
     {310, 'p', "P"},
     
     // Row 4 (401-410)
-//    {401, KEY_ESC, "Escape"},
-    {401, '\'', "Apostrophe"},  // Instead of KEY_ESC
+    {401, '\'', "Apostrophe"},
     {402, ' ', "Space"},
     {403, KEY_TAB, "Tab"},
     {404, '`', "GraveAccent"},
@@ -66,6 +55,14 @@ const KeyMapping keyMap[] = {
 };
 
 const int KEY_MAP_SIZE = sizeof(keyMap) / sizeof(keyMap[0]);
+
+const KeyMapping* getKeyMap() {
+    return keyMap;
+}
+
+int getKeyMapSize() {
+    return KEY_MAP_SIZE;
+}
 
 // Track key states for proper hold/release
 struct KeyState {

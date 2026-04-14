@@ -75,7 +75,7 @@ void setupKeyLeds() {
   // Start dark; they'll light when we learn populated/off/on status
   keyPixels.show();
 
-  debugPrintf("Key LED strip ready on pin %d with %d pixels", EXECUTOR_LED_PIN, EXECUTOR_LED_COUNT);
+  LED_EXEC_DEBUG_PRINTF("Key LED strip ready on pin %d with %d pixels", EXECUTOR_LED_PIN, EXECUTOR_LED_COUNT);
   
 }
 
@@ -103,6 +103,32 @@ void updateKeyLeds() {
     }
 
     fillExecutorPixels(i, brightness);
+  }
+
+  keyPixels.show();
+}
+
+void showExecutorStartupFromFaderColors(const uint8_t colors10[NUM_FADERS][3]) {
+  if (colors10 == nullptr) {
+    return;
+  }
+
+  // Repeat the 10 startup colors across the 40 executor LEDs in groups of 10.
+  for (int execIndex = 0; execIndex < NUM_EXECUTORS_TRACKED; ++execIndex) {
+    int faderIndex = execIndex % NUM_FADERS;
+    uint8_t r = colors10[faderIndex][0];
+    uint8_t g = colors10[faderIndex][1];
+    uint8_t b = colors10[faderIndex][2];
+    uint32_t color = keyPixels.Color(r, g, b);
+
+    int startPixel = EXEC_LED_START[execIndex];
+    if (startPixel < 0 || startPixel + EXECUTOR_PIXELS_PER_KEY > EXECUTOR_LED_COUNT) {
+      continue;
+    }
+
+    for (int i = 0; i < EXECUTOR_PIXELS_PER_KEY; ++i) {
+      keyPixels.setPixelColor(startPixel + i, color);
+    }
   }
 
   keyPixels.show();
