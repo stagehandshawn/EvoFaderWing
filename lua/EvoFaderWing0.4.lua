@@ -80,9 +80,11 @@ function main(...)
         end
 
         -- Wing status bitmask flags (must match WING_STATUS_* defines in Config.h)
-        local WING_STATUS_DESK_LOCK     = 1  -- bit 0: desk is locked
-        local WING_STATUS_CMD_MODE      = 2  -- bit 1: MA3 cmd line active, add executor to cmdline
-        local WING_STATUS_CMD_EXEC_MODE = 4  -- bit 2: MA3 cmd line active, add + auto-execute
+        local WING_STATUS_DESK_LOCK     = 1   -- bit 0: desk is locked
+        local WING_STATUS_CMD_MODE      = 2   -- bit 1: MA3 cmd line active, add executor to cmdline
+        local WING_STATUS_CMD_EXEC_MODE = 4   -- bit 2: MA3 cmd line active, add + auto-execute
+        local WING_STATUS_CMD_COPY_SRC  = 8   -- bit 3: copy/move with source already selected
+        local WING_STATUS_CMD_THRU      = 16  -- bit 4: thru active, send only exec number (no Page X.Y)
 
         local function buildWingStatusFlags(deskLocked, cmdFlags)
             local flags = cmdFlags or 0
@@ -92,20 +94,22 @@ function main(...)
 
         -- CMD keyword table: true = intercept + Execute Yes, false = intercept + Execute No.
         -- Keywords not listed here = no interception, button behaves normally.
+        -- copy and move are handled separately below (context-aware behaviour).
         local CMD_KEYWORDS = {
-            store=true,  delete=true,  copy=false,    merge=true,
+            store=true,  delete=true,  merge=true,
             update=true, include=true, on=true,      off=true,
             toggle=true, release=true, rel=true,     kill=true,
             load=true,   select=true,  go=true,      goback=true,
             top=true,    temp=true,    flash=true,   activate=true,
             deactivate=true, unassign=true,
             lock=true,   unlock=true,  label=true,
-            move=false, edit=true, assign=true
+            edit=true, assign=true
         }
 
         -- Returns the wingStatus CMD flags for the current MA3 command line.
         -- WING_STATUS_CMD_EXEC_MODE: CMD_KEYWORDS[keyword] == true  -> Execute Yes
         -- WING_STATUS_CMD_MODE:      CMD_KEYWORDS[keyword] == false -> Execute No, user confirms
+        -- WING_STATUS_CMD_COPY_SRC:  copy/move with source already selected -> Wing decides + prefix
         -- 0:                         keyword not listed or empty    -> no interception
         local function getCmdFlags()
             local ok, text = pcall(function()
@@ -113,8 +117,41 @@ function main(...)
                 return cmd and cmd.cmdtext or ""
             end)
             if not ok or type(text) ~= "string" or text == "" then return 0 end
+
+            -- If cmdline ends with "At" (destination prompt), always send Page X.Y + Execute
+            if string.match(string.lower(text), "%sat%s*$") then
+                return WING_STATUS_CMD_EXEC_MODE
+            end
+
             local keyword = string.lower(string.match(text, "^%s*(%a+)") or "")
             if keyword == "" then return 0 end
+
+            -- copy/move: context-aware — detect whether source is already on the cmdline
+            -- | State                          | Wing status        | C++ result                        |
+            -- | copy/move, no args             | CMD_MODE           | Page X.Y added, no execute        |
+            -- | copy/move + thru in cmdline    | CMD_MODE           | Page X.Y added, no execute        |
+            -- | copy/move, source selected     | CMD_COPY_SRC       | empty→At Page X.Y+Enter           |
+            -- |                               |                    | occupied→+ Page X.Y, no execute   |
+            if keyword == "copy" or keyword == "move" then
+                local rest = string.match(text, "^%s*%a+%s+(.-)%s*$") or ""
+                if rest ~= "" then
+                    -- thru handling:
+                    --   "Copy Page 1.X Thru"          → thru open, send exec# only, no execute
+                    --   "Copy Page 1.X Thru Page 1.Y" → thru complete, send exec# only + execute
+                    if string.find(string.lower(rest), "thru", 1, true) then
+                        local afterThru = string.match(string.lower(rest), "thru%s+(%S+)")
+                        if afterThru and afterThru ~= "" then
+                            return WING_STATUS_CMD_COPY_SRC  -- range complete, next = At Page X.Y + execute
+                        else
+                            return WING_STATUS_CMD_THRU      -- open range, send exec# only, no execute
+                        end
+                    end
+                    return WING_STATUS_CMD_COPY_SRC  -- source selected, Wing checks target occupancy
+                else
+                    return WING_STATUS_CMD_MODE      -- just "Copy"/"Move", add page without execute
+                end
+            end
+
             local entry = CMD_KEYWORDS[keyword]
             if entry == nil then return 0 end
             return entry and WING_STATUS_CMD_EXEC_MODE or WING_STATUS_CMD_MODE

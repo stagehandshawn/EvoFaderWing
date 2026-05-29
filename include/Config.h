@@ -257,6 +257,7 @@ extern int currentOSCPage;
 #define WING_STATUS_DESK_LOCK     1  // Bit 0: desk is locked
 #define WING_STATUS_CMD_MODE      2  // Bit 1: MA3 cmd line active — add executor to cmdline
 #define WING_STATUS_CMD_EXEC_MODE 4  // Bit 2: MA3 cmd line active — add executor + auto-execute
+#define WING_STATUS_CMD_COPY_SRC  8  // Bit 3: copy/move with source already selected — target determines + prefix
 extern bool deskLocked;
 
 // Touch sensor globals

@@ -11,6 +11,7 @@
 #include "Utils.h"
 #include "EEPROMStorage.h"
 #include "NetworkOSC.h"
+#include "ExecutorStatus.h"
 #include "Keysend.h"
 
 // There are a lot of safeguards here to handle noisy i2c lines so even the most EMI unfriendly build should behave well
@@ -472,19 +473,46 @@ void sendKeyOSC(uint16_t keyNumber, uint8_t state) {
 
   // CMD mode: intercept button press and create/update EvoFaderWingCMD macro via /cmd OSC.
   // Uses confirmed MA3 syntax: Set Macro "Name".1 property="value"
-  if (state == 1 && (wingCmdMode || wingCmdExecMode)) {
-    const char* executeFlag = wingCmdExecMode ? "Yes" : "No";
+  //
+  // Wing status → behaviour matrix:
+  // ┌──────────────────────────────────────┬──────────────────────┬─────────┐
+  // │ State                                │ Macro command        │ Execute │
+  // ├──────────────────────────────────────┼──────────────────────┼─────────┤
+  // │ CMD_MODE   (most keywords)           │ Page X.Y             │ No      │
+  // │ CMD_EXEC_MODE (store, del, ...)      │ Page X.Y             │ Yes     │
+  // │ CMD_COPY_SRC + empty target          │ At Page X.Y          │ Yes     │
+  // │ CMD_COPY_SRC + occupied target       │ + Page X.Y           │ No      │
+  // │ CMD_THRU (thru open, no end)         │ Y   (exec# only)     │ No      │
+  // │ CMD_THRU + CMD_EXEC_MODE (thru done) │ Y   (exec# only)     │ Yes     │
+  // └──────────────────────────────────────┴──────────────────────┴─────────┘
+  if (state == 1 && (wingCmdMode || wingCmdExecMode || wingCmdCopySrc || wingCmdThru)) {
+    bool targetOccupied = false;
+    if (wingCmdCopySrc) {
+      int targetIdx = keyIndexFromNumber(keyNumber);
+      targetOccupied = (targetIdx >= 0 && executorStatus[targetIdx] > 0);
+    }
+
+    const char* executeFlag = (wingCmdExecMode || (wingCmdCopySrc && !targetOccupied)) ? "Yes" : "No";
     char deleteBuf[40];
     char storeMacroBuf[40];
     char storeLineBuf[40];
-    char setCmdBuf[72];
+    char setCmdBuf[80];
     char setAddBuf[56];
     char setExecBuf[56];
     char goBuf[32];
     snprintf(deleteBuf,     sizeof(deleteBuf),     "Delete Macro EvoFaderWingCMD");
     snprintf(storeMacroBuf, sizeof(storeMacroBuf), "Store Macro EvoFaderWingCMD");
     snprintf(storeLineBuf,  sizeof(storeLineBuf),  "Store Macro EvoFaderWingCMD.1");
-    snprintf(setCmdBuf,     sizeof(setCmdBuf),     "Set Macro EvoFaderWingCMD.1 command=\"Page %d.%d\"", currentOSCPage, (int)keyNumber);
+    if (wingCmdThru) {
+      // thru active: send only the executor number, no Page X.Y prefix
+      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"%d\"", (int)keyNumber);
+    } else if (wingCmdCopySrc && targetOccupied) {
+      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"+ Page %d.%d\"", currentOSCPage, (int)keyNumber);
+    } else if (wingCmdCopySrc) {
+      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"At Page %d.%d\"", currentOSCPage, (int)keyNumber);
+    } else {
+      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"Page %d.%d\"", currentOSCPage, (int)keyNumber);
+    }
     snprintf(setAddBuf,     sizeof(setAddBuf),     "Set Macro EvoFaderWingCMD.1 AddToCmdLine=\"Yes\"");
     snprintf(setExecBuf,    sizeof(setExecBuf),    "Set Macro EvoFaderWingCMD.1 Execute=\"%s\"", executeFlag);
     snprintf(goBuf,         sizeof(goBuf),         "Go Macro EvoFaderWingCMD");
@@ -497,7 +525,9 @@ void sendKeyOSC(uint16_t keyNumber, uint8_t state) {
     sendOscMessage("/cmd", ",s", setExecBuf);
     delay(50);
     sendOscMessage("/cmd", ",s", goBuf);
-    I2C_DEBUG_PRINTF("[CMD] mode=%s exec=%d macro fired", wingCmdExecMode ? "exec" : "cmd", (int)keyNumber);
+    I2C_DEBUG_PRINTF("[CMD] mode=%s key=%d occupied=%d macro fired",
+      wingCmdThru ? "thru" : (wingCmdCopySrc ? "copySrc" : (wingCmdExecMode ? "exec" : "cmd")),
+      (int)keyNumber, targetOccupied ? 1 : 0);
     return;
   }
 

@@ -19,6 +19,8 @@ class AsyncUDP;
 extern AsyncUDP oscUdp;
 extern bool wingCmdMode;      // True when MA3 command line is active (add-to-cmdline mode)
 extern bool wingCmdExecMode;  // True when MA3 command line has an auto-executing command
+extern bool wingCmdCopySrc;   // True when copy/move source is already selected on MA3 cmdline
+extern bool wingCmdThru;      // True when thru is active — send only exec number, no Page X.Y
 
 //================================
 // FUNCTION DECLARATIONS
