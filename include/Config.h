@@ -96,7 +96,7 @@ static const uint8_t DEBUG_CONFIG_VERSION = 2;
 #define TOUCH_SENSOR_MTCH2120 1
 #endif
 
-#define IRQ_PIN 13
+#define IRQ_PIN 41
 
 #ifndef MTCH2120_ADDRESS
 #define MTCH2120_ADDRESS 0x20
