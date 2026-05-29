@@ -500,21 +500,21 @@ void sendKeyOSC(uint16_t keyNumber, uint8_t state) {
     char setAddBuf[56];
     char setExecBuf[56];
     char goBuf[32];
-    snprintf(deleteBuf,     sizeof(deleteBuf),     "Delete Macro EvoFaderWingCMD");
-    snprintf(storeMacroBuf, sizeof(storeMacroBuf), "Store Macro EvoFaderWingCMD");
-    snprintf(storeLineBuf,  sizeof(storeLineBuf),  "Store Macro EvoFaderWingCMD.1");
+    snprintf(deleteBuf,     sizeof(deleteBuf),     "Delete Macro EvoFaderWingCMD /NoOops");
+    snprintf(storeMacroBuf, sizeof(storeMacroBuf), "Store Macro EvoFaderWingCMD /NoOops");
+    snprintf(storeLineBuf,  sizeof(storeLineBuf),  "Store Macro EvoFaderWingCMD.1 /NoOops");
     if (wingCmdThru) {
       // thru active: send only the executor number, no Page X.Y prefix
-      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"%d\"", (int)keyNumber);
+      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"%d\" /NoOops", (int)keyNumber);
     } else if (wingCmdCopySrc && targetOccupied) {
-      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"+ Page %d.%d\"", currentOSCPage, (int)keyNumber);
+      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"+ Page %d.%d\" /NoOops", currentOSCPage, (int)keyNumber);
     } else if (wingCmdCopySrc) {
-      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"At Page %d.%d\"", currentOSCPage, (int)keyNumber);
+      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"At Page %d.%d\" /NoOops", currentOSCPage, (int)keyNumber);
     } else {
-      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"Page %d.%d\"", currentOSCPage, (int)keyNumber);
+      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"Page %d.%d\" /NoOops", currentOSCPage, (int)keyNumber);
     }
-    snprintf(setAddBuf,     sizeof(setAddBuf),     "Set Macro EvoFaderWingCMD.1 AddToCmdLine=\"Yes\"");
-    snprintf(setExecBuf,    sizeof(setExecBuf),    "Set Macro EvoFaderWingCMD.1 Execute=\"%s\"", executeFlag);
+    snprintf(setAddBuf,     sizeof(setAddBuf),     "Set Macro EvoFaderWingCMD.1 AddToCmdLine=\"Yes\" /NoOops");
+    snprintf(setExecBuf,    sizeof(setExecBuf),    "Set Macro EvoFaderWingCMD.1 Execute=\"%s\" /NoOops", executeFlag);
     snprintf(goBuf,         sizeof(goBuf),         "Go Macro EvoFaderWingCMD");
     sendOscMessage("/cmd", ",s", deleteBuf);
     delay(10);
