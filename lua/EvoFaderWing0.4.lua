@@ -71,6 +71,25 @@ function main(...)
             return feedback
         end
 
+        local function isDeskLocked()
+            local ok, result = pcall(function() return DeskLocked() end)
+            if ok and result ~= nil then
+                return result == true or result == 1
+            end
+            return false
+        end
+
+        -- Wing status bitmask flags (extend here for future status bits)
+        local WING_STATUS_DESK_LOCK = 1  -- bit 0
+
+        local function buildWingStatusFlags(deskLocked)
+            local flags = 0
+            if deskLocked then flags = flags + WING_STATUS_DESK_LOCK end
+            -- add future flags here, e.g.:
+            -- if someOtherState then flags = flags + WING_STATUS_OTHER end
+            return flags
+        end
+
         local execRanges = {
             {101, 110},
             {201, 210},
@@ -421,6 +440,8 @@ function main(...)
         local lastSentPageUpdate = nil
         local PAGE_SETTLE_GUARD_TICKS = 3
         local pageSettleGuardTicks = 0
+        local lastDeskLockState = isDeskLocked()
+        local deskLockChanged = false
 
         local HOOK_DEBUG = false
         local hasHookObjectChange = type(HookObjectChange) == "function"
@@ -622,6 +643,19 @@ function main(...)
                 end
             end
 
+            local currentDeskLock = isDeskLocked()
+            if currentDeskLock ~= lastDeskLockState then
+                lastDeskLockState = currentDeskLock
+                deskLockChanged = true
+                markStateDirty()
+                Printf("Desk lock state changed: " .. (currentDeskLock and "LOCKED" or "UNLOCKED"))
+                if not currentDeskLock then
+                    forceReload = true
+                    markAllExecsDirty()
+                    Printf("Desk unlocked - forcing full data resend")
+                end
+            end
+
             local myPage = CurrentExecPage()
             local currentPageIndex = destPage
             if myPage and myPage.index ~= nil then
@@ -645,7 +679,7 @@ function main(...)
                 markAllExecsDirty()
             end
 
-            if stateDirty or forceReload then
+            if stateDirty or forceReload or deskLockChanged then
                 local refreshDetails = forceReload or pageDirty or not hooksEnabled
                 if not refreshDetails then
                     for _, execNo in ipairs(executorsToWatch) do
@@ -673,6 +707,15 @@ function main(...)
                 end
 
                 local allowDeltaSend = pageSettleGuardTicks <= 0
+
+                -- Send wingStatus FIRST when desk lock changes so the wing can reset
+                -- fader ownership before the execUpdate setpoints arrive
+                if forceReload or deskLockChanged then
+                    local flags = buildWingStatusFlags(lastDeskLockState)
+                    sendOsc("/wingStatus,i," .. flags)
+                    Printf("Sent wing status update: deskLock=" .. (lastDeskLockState and "1" or "0") .. " flags=" .. flags)
+                    deskLockChanged = false
+                end
 
                 if forceReload or (allowDeltaSend and (state.faderDataChanged or state.statusChanged)) then
                     local execMessage = "/execUpdate" .. execUpdateTypeTag .. "," .. destPage

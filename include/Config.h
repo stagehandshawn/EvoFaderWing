@@ -253,6 +253,10 @@ extern ExecConfig execConfig;
 // Page tracking
 extern int currentOSCPage;
 
+// Wing status / desk lock
+#define WING_STATUS_DESK_LOCK 1
+extern bool deskLocked;
+
 // Touch sensor globals
 extern int autoCalibrationMode;
 extern uint8_t touchThreshold;

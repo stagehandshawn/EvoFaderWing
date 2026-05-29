@@ -499,6 +499,10 @@ void OLED::showNetworkStatus(OLEDNetworkState state, IPAddress ip, uint16_t oscP
     ipScreenDirty = false;
 }
 
+void OLED::markDirty() {
+    ipScreenDirty = true;
+}
+
 void OLED::addDebugLine(const char* text) {
     // Debug output to OLED is disabled.
 }

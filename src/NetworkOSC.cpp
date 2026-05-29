@@ -6,6 +6,8 @@
 #include "Config.h"
 #include "ExecutorStatus.h"
 #include "KeyLedControl.h"
+#include "OLED.h"
+#include "NetworkManager.h"
 #include <AsyncUDP_Teensy41.h>
 #include <string.h>
 
@@ -16,6 +18,7 @@
 
 AsyncUDP oscUdp;
 static bool networkServicesStarted = false;
+bool deskLocked = false;
 
 //================================
 // OSC QUEUE (keeps UDP callback short)
@@ -42,6 +45,7 @@ static volatile uint32_t oscOversizeDrops = 0;
 // Forward declarations for async callbacks
 void handleBundledExecutorUpdate(LiteOSCParser& parser);
 void handleColorUpdate(LiteOSCParser& parser);
+void handleWingStatus(LiteOSCParser& parser);
 static void handleOscPacket(const uint8_t* data, size_t len);
 static bool enqueueOscPacket(const uint8_t* data, size_t len);
 static bool dequeueOscPacket(OscQueueItem& out);
@@ -161,6 +165,8 @@ static void handleOscPacket(const uint8_t* data, size_t len) {
     handleBundledExecutorUpdate(parser);
   } else if (strstr(addr, "/colorUpdate") != NULL) {
     handleColorUpdate(parser);
+  } else if (strstr(addr, "/wingStatus") != NULL) {
+    handleWingStatus(parser);
   } else if (strstr(addr, "/updatePage/current") != NULL) {
     if (parser.getTag(0) == 'i') {
       handlePageUpdate(addr, parser.getInt(0));
@@ -254,6 +260,38 @@ static void applyColorToExecutor(int oscId, const char* colorString) {
   }
 }
 
+
+// Handle wing status updates: desk lock flag and future status bits
+void handleWingStatus(LiteOSCParser& parser) {
+  if (parser.getArgCount() < 1 || parser.getTag(0) != 'i') {
+    OSC_ERROR_PRINT("Invalid wingStatus message");
+    return;
+  }
+
+  int flags = parser.getInt(0);
+  bool newDeskLocked = (flags & WING_STATUS_DESK_LOCK) != 0;
+  OSC_DEBUG_PRINTF("Wing status: flags=%d deskLocked=%d", flags, newDeskLocked ? 1 : 0);
+
+  if (newDeskLocked == deskLocked) {
+    return;
+  }
+
+  deskLocked = newDeskLocked;
+
+  if (!deskLocked) {
+    resetFaderOwnership();
+    display.markDirty();
+    display.showIPAddress(networkGetLocalIP(), netConfig.oscPort, netConfig.sendToIP);
+  } else {
+    display.clear();
+    display.setCursor(40, 16);
+    display.setTextSize(TEXT_SIZE_MEDIUM);
+    display.print("DESK");
+    display.setCursor(28, 36);
+    display.print("LOCKED");
+    display.display();
+  }
+}
 
 // Handle bundled executor updates: page + 10 fader setpoints + 40 executor statuses
 void handleBundledExecutorUpdate(LiteOSCParser& parser) {

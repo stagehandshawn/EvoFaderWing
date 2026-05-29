@@ -465,6 +465,11 @@ void sendKeyOSC(uint16_t keyNumber, uint8_t state) {
     return;
   }
   
+  // Desk lock: block all key/OSC output silently
+  if (deskLocked) {
+    return;
+  }
+
   // Send keypress if option is checked
   if (Fconfig.sendKeystrokes){
 

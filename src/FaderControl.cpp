@@ -383,7 +383,19 @@ int readFadertoOSC(Fader& f) {
 
 
 
+void resetFaderOwnership() {
+  unsigned long lockoutUntil = millis() + 500; // 500ms window for setpoints to arrive
+  for (int i = 0; i < NUM_FADERS; i++) {
+    faders[i].manualOverride = false;
+    faders[i].remoteControlLockoutUntil = lockoutUntil;
+  }
+}
+
 void sendFaderOsc(Fader& f, int value, bool force) {
+  if (deskLocked) {
+    return;
+  }
+
   unsigned long now = millis();
 
   // Only send if value changed significantly or enough time passed or force flag is set

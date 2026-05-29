@@ -93,6 +93,7 @@ public:
 
     void showIPAddress(IPAddress ip, uint16_t oscPort, IPAddress sendIP);
     void showNetworkStatus(OLEDNetworkState state, IPAddress ip, uint16_t oscPort, IPAddress sendIP);
+    void markDirty();                      // Force redraw on next showIPAddress/showNetworkStatus call
 
     // === Public Advanced Functions ===
     void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1); // Draw line
