@@ -213,6 +213,16 @@ function main(...)
             return nil
         end
 
+        local function extractCueAppearance(seqObj)
+            if seqObj == nil then return nil end
+            if seqObj.preferCueAppearance ~= true then return nil end
+            local ok, child = pcall(function() return seqObj:CurrentChild() end)
+            if not ok or child == nil then return nil end
+            local ok2, ap = pcall(function() return child[1] and child[1].Appearance end)
+            if ok2 and ap ~= nil then return ap end
+            return nil
+        end
+
         local function getName(obj)
             if obj == nil then return "nil" end
             local ok, res = pcall(function() return obj:Name() end)
@@ -397,7 +407,8 @@ function main(...)
 
             local colorValue = "0,0,0,0"
             if wantsColor then
-                local ap = extractAppearance(meta.sequenceObject)
+                local ap = extractCueAppearance(meta.sequenceObject)
+                    or extractAppearance(meta.sequenceObject)
                     or extractAppearance(meta.sequenceHostObject)
                     or extractAppearance(meta.primaryObject)
                     or extractAppearance(meta.handle)
