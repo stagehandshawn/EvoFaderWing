@@ -192,18 +192,78 @@ function main(...)
         local autoRefreshInterval = 25
         local execUpdateTypeTag = "," .. string.rep("i", 1 + 10 + #executorsToWatch)
         local colorUpdateTypeTag = "," .. "i" .. string.rep("s", #executorsToWatch)
-        local DEBUG_PROXY = false
         local DEBUG_PROXY_LINK = false
 
         local execMetaCache = {}
         local execMetaPageIndex = -1
 
-        local function getAppearanceColor(target)
-            local apper = target and target["APPEARANCE"] or nil
-            if apper ~= nil then
-                return apper["BACKR"] .. "," .. apper["BACKG"] .. "," .. apper["BACKB"] .. "," .. apper["BACKALPHA"]
+        -- Returns "R,G,B,A" (0-255) from the MA3 theme for the given pool object's type.
+        -- Primary path: Root/ColorTheme/ColorGroups/PoolDefault/<TypeName> (singular, e.g. "Group", "Master")
+        -- The typeName is extracted from tostring(obj) = "Group 18" -> "Group", matching PoolDefault keys directly.
+        -- Falls back to a full ColorGroups scan if PoolDefault doesn't have the key.
+        -- Result is cached per typeName to avoid repeated tree walks at 50 Hz.
+        local themeColorCache = {}
+        local function extractThemeColorString(obj)
+            if obj == nil then return nil end
+            local okStr, str = pcall(function() return tostring(obj) end)
+            if not okStr or type(str) ~= "string" then return nil end
+            local typeName = string.match(str, "^(%a+)%s+")
+            if typeName == nil then return nil end
+            -- Return cached result (false = confirmed not found)
+            if themeColorCache[typeName] ~= nil then
+                return themeColorCache[typeName] ~= false and themeColorCache[typeName] or nil
             end
-            return "255,255,255,255"
+            local ok1, root = pcall(function() return Root() end)
+            if not ok1 or root == nil then return nil end
+
+            local function parseRGBA(e)
+                if e == nil then return nil end
+                local okR, rgba = pcall(function() return e["RGBA"] end)
+                if not okR or rgba == nil or type(rgba) ~= "string" or #rgba ~= 8 then return nil end
+                local r = tonumber(rgba:sub(1,2), 16)
+                local g = tonumber(rgba:sub(3,4), 16)
+                local b = tonumber(rgba:sub(5,6), 16)
+                local a = tonumber(rgba:sub(7,8), 16)
+                if r == nil or g == nil or b == nil or a == nil then return nil end
+                return r .. "," .. g .. "," .. b .. "," .. a
+            end
+
+            -- Fast path: PoolDefault contains all pool type defaults with singular keys
+            local okPD, pd = pcall(function()
+                return root["ColorTheme"]["ColorGroups"]["PoolDefault"]
+            end)
+            if okPD and pd ~= nil then
+                local okE, e = pcall(function() return pd[typeName] end)
+                if okE and e ~= nil then
+                    local result = parseRGBA(e)
+                    if result ~= nil then
+                        themeColorCache[typeName] = result
+                        return result
+                    end
+                end
+            end
+
+            -- Fallback: search all ColorGroups children (plural and singular keys)
+            local okCG, cg = pcall(function() return root["ColorTheme"]["ColorGroups"] end)
+            if okCG and cg ~= nil then
+                for ci = 1, 100 do
+                    local okChild, child = pcall(function() return cg[ci] end)
+                    if not okChild or child == nil then break end
+                    for _, key in ipairs({ typeName .. "s", typeName }) do
+                        local okE, e = pcall(function() return child[key] end)
+                        if okE and e ~= nil then
+                            local result = parseRGBA(e)
+                            if result ~= nil then
+                                themeColorCache[typeName] = result
+                                return result
+                            end
+                        end
+                    end
+                end
+            end
+
+            themeColorCache[typeName] = false  -- cache miss
+            return nil
         end
 
         local function extractAppearance(target)
@@ -245,6 +305,28 @@ function main(...)
             end
             return string.lower(tostring(t))
         end
+
+        -- Navigates to the DataPool entry for any object whose tostring() is "TypeName Index"
+        -- (e.g. "Group 18", "Sequence 5", "Macro 3") and returns its APPEARANCE, or nil.
+        local function extractPoolAppearance(obj)
+            if obj == nil then return nil end
+            local okStr, str = pcall(function() return tostring(obj) end)
+            if not okStr or type(str) ~= "string" then return nil end
+            local typeName, idx = string.match(str, "^(%a+)%s+(%d+)$")
+            if typeName == nil or idx == nil then return nil end
+            idx = tonumber(idx)
+            local poolKey = typeName .. "s"  -- "Group" -> "Groups", "Sequence" -> "Sequences"
+            local okPool, pool = pcall(function() return DataPool() end)
+            if not okPool or pool == nil then return nil end
+            local ok2, poolColl = pcall(function() return pool[poolKey] end)
+            if not ok2 or poolColl == nil then return nil end
+            local ok3, entry = pcall(function() return poolColl[idx] end)
+            if not ok3 or entry == nil then return nil end
+            local ok4, ap = pcall(function() return entry["APPEARANCE"] end)
+            if ok4 and ap ~= nil then return ap end
+            return nil
+        end
+
 
         local function isSequence(obj)
             if obj == nil then return false end
@@ -394,7 +476,7 @@ function main(...)
         local function readExecutorState(execNo, wantsValue, wantsColor)
             local meta = execMetaCache[execNo]
             if meta == nil or meta.handle == nil then
-                return 0, "0,0,0,0", 0, nil, false
+                return 0, "0,0,0,0", 0
             end
 
             local faderValue = 0
@@ -412,10 +494,14 @@ function main(...)
                     or extractAppearance(meta.sequenceHostObject)
                     or extractAppearance(meta.primaryObject)
                     or extractAppearance(meta.handle)
+                    or extractPoolAppearance(meta.handleObject)
+                    or extractPoolAppearance(meta.primaryObject)
                 if ap ~= nil then
                     colorValue = ap["BACKR"] .. "," .. ap["BACKG"] .. "," .. ap["BACKB"] .. "," .. ap["BACKALPHA"]
                 else
-                    colorValue = getAppearanceColor(meta.primaryObject or meta.handle)
+                    colorValue = extractThemeColorString(meta.handleObject)
+                        or extractThemeColorString(meta.primaryObject)
+                        or "255,255,255,255"
                 end
             end
 
@@ -443,9 +529,8 @@ function main(...)
 
             for _, execNo in ipairs(executorsToWatch) do
                 local wantsValue = (execNo >= 201 and execNo <= 210)
-                local wantsColor = true
                 local refreshThis = refreshDetails or (execDirtyFlags and execDirtyFlags[execNo] == true)
-                local wantsColorThis = wantsColor and refreshThis
+                local wantsColorThis = refreshThis
 
                 local faderValue, colorValue, statusCode = readExecutorState(execNo, wantsValue, wantsColorThis)
                 if refreshThis and execDirtyFlags then
@@ -459,8 +544,7 @@ function main(...)
                     end
                 end
 
-                if wantsColor then
-                    if wantsColorThis then
+                if wantsColorThis then
                         currentColorValues[execNo] = colorValue
                         if oldColorValues[execNo] ~= colorValue then
                             colorChanged = true
@@ -473,7 +557,6 @@ function main(...)
                     else
                         currentColorValues[execNo] = oldColorValues[execNo] or colorValue
                     end
-                end
 
                 currentExecStatus[execNo] = statusCode
                 if oldExecStatus[execNo] ~= statusCode then
