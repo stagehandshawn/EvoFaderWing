@@ -79,15 +79,45 @@ function main(...)
             return false
         end
 
-        -- Wing status bitmask flags (extend here for future status bits)
-        local WING_STATUS_DESK_LOCK = 1  -- bit 0
+        -- Wing status bitmask flags (must match WING_STATUS_* defines in Config.h)
+        local WING_STATUS_DESK_LOCK     = 1  -- bit 0: desk is locked
+        local WING_STATUS_CMD_MODE      = 2  -- bit 1: MA3 cmd line active, add executor to cmdline
+        local WING_STATUS_CMD_EXEC_MODE = 4  -- bit 2: MA3 cmd line active, add + auto-execute
 
-        local function buildWingStatusFlags(deskLocked)
-            local flags = 0
+        local function buildWingStatusFlags(deskLocked, cmdFlags)
+            local flags = cmdFlags or 0
             if deskLocked then flags = flags + WING_STATUS_DESK_LOCK end
-            -- add future flags here, e.g.:
-            -- if someOtherState then flags = flags + WING_STATUS_OTHER end
             return flags
+        end
+
+        -- CMD keyword table: true = intercept + Execute Yes, false = intercept + Execute No.
+        -- Keywords not listed here = no interception, button behaves normally.
+        local CMD_KEYWORDS = {
+            store=true,  delete=true,  copy=false,    merge=true,
+            update=true, include=true, on=true,      off=true,
+            toggle=true, release=true, rel=true,     kill=true,
+            load=true,   select=true,  go=true,      goback=true,
+            top=true,    temp=true,    flash=true,   activate=true,
+            deactivate=true, unassign=true,
+            lock=true,   unlock=true,  label=true,
+            move=false, edit=true, assign=true
+        }
+
+        -- Returns the wingStatus CMD flags for the current MA3 command line.
+        -- WING_STATUS_CMD_EXEC_MODE: CMD_KEYWORDS[keyword] == true  -> Execute Yes
+        -- WING_STATUS_CMD_MODE:      CMD_KEYWORDS[keyword] == false -> Execute No, user confirms
+        -- 0:                         keyword not listed or empty    -> no interception
+        local function getCmdFlags()
+            local ok, text = pcall(function()
+                local cmd = CmdObj()
+                return cmd and cmd.cmdtext or ""
+            end)
+            if not ok or type(text) ~= "string" or text == "" then return 0 end
+            local keyword = string.lower(string.match(text, "^%s*(%a+)") or "")
+            if keyword == "" then return 0 end
+            local entry = CMD_KEYWORDS[keyword]
+            if entry == nil then return 0 end
+            return entry and WING_STATUS_CMD_EXEC_MODE or WING_STATUS_CMD_MODE
         end
 
         local execRanges = {
@@ -442,6 +472,8 @@ function main(...)
         local pageSettleGuardTicks = 0
         local lastDeskLockState = isDeskLocked()
         local deskLockChanged = false
+        local lastCmdFlags = 0
+        local cmdFlagsChanged = false
 
         local HOOK_DEBUG = false
         local hasHookObjectChange = type(HookObjectChange) == "function"
@@ -656,6 +688,14 @@ function main(...)
                 end
             end
 
+            -- CMD mode: poll MA3 command line state and push changes via wingStatus flags
+            local currentCmdFlags = getCmdFlags()
+            if currentCmdFlags ~= lastCmdFlags then
+                lastCmdFlags = currentCmdFlags
+                cmdFlagsChanged = true
+                Printf("CMD mode changed: flags=" .. currentCmdFlags)
+            end
+
             local myPage = CurrentExecPage()
             local currentPageIndex = destPage
             if myPage and myPage.index ~= nil then
@@ -679,7 +719,7 @@ function main(...)
                 markAllExecsDirty()
             end
 
-            if stateDirty or forceReload or deskLockChanged then
+            if stateDirty or forceReload or deskLockChanged or cmdFlagsChanged then
                 local refreshDetails = forceReload or pageDirty or not hooksEnabled
                 if not refreshDetails then
                     for _, execNo in ipairs(executorsToWatch) do
@@ -710,11 +750,12 @@ function main(...)
 
                 -- Send wingStatus FIRST when desk lock changes so the wing can reset
                 -- fader ownership before the execUpdate setpoints arrive
-                if forceReload or deskLockChanged then
-                    local flags = buildWingStatusFlags(lastDeskLockState)
+                if forceReload or deskLockChanged or cmdFlagsChanged then
+                    local flags = buildWingStatusFlags(lastDeskLockState, lastCmdFlags)
                     sendOsc("/wingStatus,i," .. flags)
-                    Printf("Sent wing status update: deskLock=" .. (lastDeskLockState and "1" or "0") .. " flags=" .. flags)
+                    Printf("Sent wing status: deskLock=" .. (lastDeskLockState and "1" or "0") .. " cmdFlags=" .. lastCmdFlags .. " flags=" .. flags)
                     deskLockChanged = false
+                    cmdFlagsChanged = false
                 end
 
                 if forceReload or (allowDeltaSend and (state.faderDataChanged or state.statusChanged)) then

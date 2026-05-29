@@ -19,6 +19,8 @@
 AsyncUDP oscUdp;
 static bool networkServicesStarted = false;
 bool deskLocked = false;
+bool wingCmdMode = false;
+bool wingCmdExecMode = false;
 
 //================================
 // OSC QUEUE (keeps UDP callback short)
@@ -261,7 +263,7 @@ static void applyColorToExecutor(int oscId, const char* colorString) {
 }
 
 
-// Handle wing status updates: desk lock flag and future status bits
+// Handle wing status updates: desk lock flag and CMD mode bits
 void handleWingStatus(LiteOSCParser& parser) {
   if (parser.getArgCount() < 1 || parser.getTag(0) != 'i') {
     OSC_ERROR_PRINT("Invalid wingStatus message");
@@ -269,8 +271,15 @@ void handleWingStatus(LiteOSCParser& parser) {
   }
 
   int flags = parser.getInt(0);
-  bool newDeskLocked = (flags & WING_STATUS_DESK_LOCK) != 0;
-  OSC_DEBUG_PRINTF("Wing status: flags=%d deskLocked=%d", flags, newDeskLocked ? 1 : 0);
+  bool newDeskLocked  = (flags & WING_STATUS_DESK_LOCK) != 0;
+  bool newCmdMode     = (flags & WING_STATUS_CMD_MODE) != 0;
+  bool newCmdExecMode = (flags & WING_STATUS_CMD_EXEC_MODE) != 0;
+  OSC_DEBUG_PRINTF("Wing status: flags=%d deskLock=%d cmd=%d cmdExec=%d",
+                   flags, newDeskLocked ? 1 : 0, newCmdMode ? 1 : 0, newCmdExecMode ? 1 : 0);
+
+  // Always update CMD mode flags — they change independently of deskLocked
+  wingCmdMode     = newCmdMode;
+  wingCmdExecMode = newCmdExecMode;
 
   if (newDeskLocked == deskLocked) {
     return;

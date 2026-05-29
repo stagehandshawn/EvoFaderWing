@@ -17,6 +17,8 @@ class AsyncUDP;
 //================================
 
 extern AsyncUDP oscUdp;
+extern bool wingCmdMode;      // True when MA3 command line is active (add-to-cmdline mode)
+extern bool wingCmdExecMode;  // True when MA3 command line has an auto-executing command
 
 //================================
 // FUNCTION DECLARATIONS
