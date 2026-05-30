@@ -39,7 +39,7 @@ const uint8_t PWM_PINS[NUM_FADERS] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 
 // Motor direction control pins — each fader has two pins for H-bridge control.
 const uint8_t DIR_PINS1[NUM_FADERS] = {26, 28, 30, 32, 34, 36, 38, 40, 10, 51};
-const uint8_t DIR_PINS2[NUM_FADERS] = {27, 29, 31, 33, 35, 37, 39, 41, 11, 52};
+const uint8_t DIR_PINS2[NUM_FADERS] = {27, 29, 31, 33, 35, 37, 39, 13, 11, 52};
 
 // Unique OSC IDs for each fader (used to construct OSC address strings).
 const uint16_t OSC_IDS[NUM_FADERS] = {201, 202, 203, 204, 205, 206, 207, 208, 209, 210};
