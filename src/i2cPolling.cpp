@@ -11,7 +11,9 @@
 #include "Utils.h"
 #include "EEPROMStorage.h"
 #include "NetworkOSC.h"
+#include "ExecutorStatus.h"
 #include "Keysend.h"
+#include "KeyCmdHandler.h"
 
 // There are a lot of safeguards here to handle noisy i2c lines so even the most EMI unfriendly build should behave well
 
@@ -23,22 +25,6 @@
 
 // Track last known pressed keys so the watchdog can force releases
 static bool trackedKeyStates[NUM_EXECUTORS_TRACKED] = {false};
-
-static int keyIndexFromNumber(uint16_t keyNumber) {
-  if (keyNumber >= 101 && keyNumber <= 110) return keyNumber - 101;
-  if (keyNumber >= 201 && keyNumber <= 210) return 10 + (keyNumber - 201);
-  if (keyNumber >= 301 && keyNumber <= 310) return 20 + (keyNumber - 301);
-  if (keyNumber >= 401 && keyNumber <= 410) return 30 + (keyNumber - 401);
-  return -1;
-}
-
-static uint16_t keyNumberFromIndex(int index) {
-  if (index >= 0 && index < 10) return 101 + index;
-  if (index >= 10 && index < 20) return 201 + (index - 10);
-  if (index >= 20 && index < 30) return 301 + (index - 20);
-  if (index >= 30 && index < 40) return 401 + (index - 30);
-  return 0;
-}
 
 // === I2C Slave Addresses ===
 #define I2C_ADDR_KEYBOARD  0x10  // Keyboard matrix ATmega - sends keypress data
@@ -446,49 +432,3 @@ void sendEncoderOSC(int encoderNumber, bool isPositive, int velocity) {
 
 
 
-// Updated this function to send OSC or Keypress data over USB if that setting is checked
-// May update this function name or add a seperate function later to keep things cleaner
-
-void sendKeyOSC(uint16_t keyNumber, uint8_t state) {
-  // Validate key number is in expected ranges
-  if (!((keyNumber >= 101 && keyNumber <= 110) ||
-        (keyNumber >= 201 && keyNumber <= 210) ||
-        (keyNumber >= 301 && keyNumber <= 310) ||
-        (keyNumber >= 401 && keyNumber <= 410))) {
-    I2C_ERROR_PRINTF("[OSC] Invalid key number for OSC: %d", keyNumber);
-    return;
-  }
-  
-  // Validate state
-  if (state > 1) {
-    I2C_ERROR_PRINTF("[OSC] Invalid key state: %d", state);
-    return;
-  }
-  
-  // Send keypress if option is checked
-  if (Fconfig.sendKeystrokes){
-
-    // Send press if 1 and release if 0
-    state ? sendKeyPress(keyNumber) : sendKeyRelease(keyNumber);
-
-    I2C_DEBUG_PRINTF("[Key] Sent: %d %s", keyNumber, state ? "PRESSED" : "RELEASED");
-
-  } else {
-
-    // Create the OSC address
-    char oscAddress[32];
-    snprintf(oscAddress, sizeof(oscAddress), "/Key%d", keyNumber);
-    
-    // Convert state to int for OSC message
-    int keyState = (int)state;
-    
-    // Send the OSC message
-    sendOscMessage(oscAddress, ",i", &keyState);
-    
-    // Debug output
-    I2C_DEBUG_PRINTF("[OSC] Sent: %s %d (key %d %s)", 
-              oscAddress, keyState, keyNumber, state ? "PRESSED" : "RELEASED");
-
-  }
-
-}

@@ -521,7 +521,12 @@ bool processTouchChanges() {
   }
 
   for (int i = 0; i < NUM_FADERS; i++) {
-    bool rawTouch = bitRead(currentTouches, i);
+    int touchRead = i;
+    if (i < 2) {
+      touchRead = i + 10;  // Faders 0 and 1 are on electrodes 10 and 11
+    }
+    //touchRead = 2 + i;
+    bool rawTouch = bitRead(currentTouches, touchRead);
 
     if (rawTouch) {
       releaseDebounceActive[i] = false;

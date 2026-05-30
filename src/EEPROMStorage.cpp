@@ -282,8 +282,8 @@ bool loadExecConfig() {
   execConfig.staticRed = constrain(execConfig.staticRed, 0, 255);
   execConfig.staticGreen = constrain(execConfig.staticGreen, 0, 255);
   execConfig.staticBlue = constrain(execConfig.staticBlue, 0, 255);
+  execConfig.useMA3OccupiedBrightness = execConfig.useMA3OccupiedBrightness ? true : false;
   execConfig.reserved[0] = 0;
-  execConfig.reserved[1] = 0;
 
   markKeyLedsDirty();
   EEPROM_DEBUG_PRINT("Executor LED configuration loaded from EEPROM.");
@@ -341,8 +341,8 @@ void resetToDefaults() {
   execConfig.staticRed = 255;
   execConfig.staticGreen = 255;
   execConfig.staticBlue = 255;
+  execConfig.useMA3OccupiedBrightness = false;
   execConfig.reserved[0] = 0;
-  execConfig.reserved[1] = 0;
 
   
   // Reset network settings to defaults

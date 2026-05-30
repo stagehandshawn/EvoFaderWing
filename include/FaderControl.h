@@ -18,6 +18,7 @@ void handleFaders();
 //Fader movement
 void setFaderSetpoint(int faderIndex, int oscValue);
 void moveAllFadersToSetpoints();
+void resetFaderOwnership();  // Clear manualOverride on all faders (call on desk unlock)
 
 
 int readFadertoOSC(Fader& f);

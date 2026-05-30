@@ -71,6 +71,86 @@ function main(...)
             return feedback
         end
 
+        local function isDeskLocked()
+            local ok, result = pcall(function() return DeskLocked() end)
+            if ok and result ~= nil then
+                return result == true or result == 1
+            end
+            return false
+        end
+
+        -- CMD status bitmask flags (must match WING_STATUS_* defines in Config.h)
+        -- Sent via /wingStatus as second argument. Desk lock is the first argument (0 or 1).
+        local WING_STATUS_CMD_MODE      = 2   -- bit 1: MA3 cmd line active, add executor to cmdline
+        local WING_STATUS_CMD_EXEC_MODE = 4   -- bit 2: MA3 cmd line active, add + auto-execute
+        local WING_STATUS_CMD_COPY_SRC  = 8   -- bit 3: copy/move with source already selected
+        local WING_STATUS_CMD_THRU      = 16  -- bit 4: thru active, send only exec number (no Page X.Y)
+
+        -- CMD keyword table: true = intercept + Execute Yes, false = intercept + Execute No.
+        -- Keywords not listed here = no interception, button behaves normally.
+        -- copy and move are handled separately below (context-aware behaviour).
+        local CMD_KEYWORDS = {
+            store=true, delete=true, fix=true,
+            update=true, on=true, off=true,
+            toggle=true, release=true, rel=true,
+            load=true, select=true, go=true,
+            top=true, temp=true, flash=true,   
+            deactivate=true, kill=true, activate=true,
+            lock=true, label=true, edit=true, 
+            assign=true
+        }
+
+        -- Returns the wingStatus CMD flags for the current MA3 command line.
+        -- WING_STATUS_CMD_EXEC_MODE: CMD_KEYWORDS[keyword] == true  -> Execute Yes
+        -- WING_STATUS_CMD_MODE:      CMD_KEYWORDS[keyword] == false -> Execute No, user confirms
+        -- WING_STATUS_CMD_COPY_SRC:  copy/move with source already selected -> Wing decides + prefix
+        -- 0:                         keyword not listed or empty    -> no interception
+        local function getCmdFlags()
+            local ok, text = pcall(function()
+                local cmd = CmdObj()
+                return cmd and cmd.cmdtext or ""
+            end)
+            if not ok or type(text) ~= "string" or text == "" then return 0 end
+
+            -- If cmdline ends with "At" (destination prompt), always send Page X.Y + Execute
+            if string.match(string.lower(text), "%sat%s*$") then
+                return WING_STATUS_CMD_EXEC_MODE
+            end
+
+            local keyword = string.lower(string.match(text, "^%s*(%a+)") or "")
+            if keyword == "" then return 0 end
+
+            -- copy/move: context-aware — detect whether source is already on the cmdline
+            -- | State                          | Wing status        | C++ result                        |
+            -- | copy/move, no args             | CMD_MODE           | Page X.Y added, no execute        |
+            -- | copy/move + thru in cmdline    | CMD_MODE           | Page X.Y added, no execute        |
+            -- | copy/move, source selected     | CMD_COPY_SRC       | empty→At Page X.Y+Enter           |
+            -- |                               |                    | occupied→+ Page X.Y, no execute   |
+            if keyword == "copy" or keyword == "move" then
+                local rest = string.match(text, "^%s*%a+%s+(.-)%s*$") or ""
+                if rest ~= "" then
+                    -- thru handling:
+                    --   "Copy Page 1.X Thru"          → thru open, send exec# only, no execute
+                    --   "Copy Page 1.X Thru Page 1.Y" → thru complete, send exec# only + execute
+                    if string.find(string.lower(rest), "thru", 1, true) then
+                        local afterThru = string.match(string.lower(rest), "thru%s+(%S+)")
+                        if afterThru and afterThru ~= "" then
+                            return WING_STATUS_CMD_COPY_SRC  -- range complete, next = At Page X.Y + execute
+                        else
+                            return WING_STATUS_CMD_THRU      -- open range, send exec# only, no execute
+                        end
+                    end
+                    return WING_STATUS_CMD_COPY_SRC  -- source selected, Wing checks target occupancy
+                else
+                    return WING_STATUS_CMD_MODE      -- just "Copy"/"Move", add page without execute
+                end
+            end
+
+            local entry = CMD_KEYWORDS[keyword]
+            if entry == nil then return 0 end
+            return entry and WING_STATUS_CMD_EXEC_MODE or WING_STATUS_CMD_MODE
+        end
+
         local execRanges = {
             {101, 110},
             {201, 210},
@@ -106,18 +186,78 @@ function main(...)
         local autoRefreshInterval = 25
         local execUpdateTypeTag = "," .. string.rep("i", 1 + 10 + #executorsToWatch)
         local colorUpdateTypeTag = "," .. "i" .. string.rep("s", #executorsToWatch)
-        local DEBUG_PROXY = false
         local DEBUG_PROXY_LINK = false
 
         local execMetaCache = {}
         local execMetaPageIndex = -1
 
-        local function getAppearanceColor(target)
-            local apper = target and target["APPEARANCE"] or nil
-            if apper ~= nil then
-                return apper["BACKR"] .. "," .. apper["BACKG"] .. "," .. apper["BACKB"] .. "," .. apper["BACKALPHA"]
+        -- Returns "R,G,B,A" (0-255) from the MA3 theme for the given pool object's type.
+        -- Primary path: Root/ColorTheme/ColorGroups/PoolDefault/<TypeName> (singular, e.g. "Group", "Master")
+        -- The typeName is extracted from tostring(obj) = "Group 18" -> "Group", matching PoolDefault keys directly.
+        -- Falls back to a full ColorGroups scan if PoolDefault doesn't have the key.
+        -- Result is cached per typeName to avoid repeated tree walks at 50 Hz.
+        local themeColorCache = {}
+        local function extractThemeColorString(obj)
+            if obj == nil then return nil end
+            local okStr, str = pcall(function() return tostring(obj) end)
+            if not okStr or type(str) ~= "string" then return nil end
+            local typeName = string.match(str, "^(%a+)%s+")
+            if typeName == nil then return nil end
+            -- Return cached result (false = confirmed not found)
+            if themeColorCache[typeName] ~= nil then
+                return themeColorCache[typeName] ~= false and themeColorCache[typeName] or nil
             end
-            return "255,255,255,255"
+            local ok1, root = pcall(function() return Root() end)
+            if not ok1 or root == nil then return nil end
+
+            local function parseRGBA(e)
+                if e == nil then return nil end
+                local okR, rgba = pcall(function() return e["RGBA"] end)
+                if not okR or rgba == nil or type(rgba) ~= "string" or #rgba ~= 8 then return nil end
+                local r = tonumber(rgba:sub(1,2), 16)
+                local g = tonumber(rgba:sub(3,4), 16)
+                local b = tonumber(rgba:sub(5,6), 16)
+                local a = tonumber(rgba:sub(7,8), 16)
+                if r == nil or g == nil or b == nil or a == nil then return nil end
+                return r .. "," .. g .. "," .. b .. "," .. a
+            end
+
+            -- Fast path: PoolDefault contains all pool type defaults with singular keys
+            local okPD, pd = pcall(function()
+                return root["ColorTheme"]["ColorGroups"]["PoolDefault"]
+            end)
+            if okPD and pd ~= nil then
+                local okE, e = pcall(function() return pd[typeName] end)
+                if okE and e ~= nil then
+                    local result = parseRGBA(e)
+                    if result ~= nil then
+                        themeColorCache[typeName] = result
+                        return result
+                    end
+                end
+            end
+
+            -- Fallback: search all ColorGroups children (plural and singular keys)
+            local okCG, cg = pcall(function() return root["ColorTheme"]["ColorGroups"] end)
+            if okCG and cg ~= nil then
+                for ci = 1, 100 do
+                    local okChild, child = pcall(function() return cg[ci] end)
+                    if not okChild or child == nil then break end
+                    for _, key in ipairs({ typeName .. "s", typeName }) do
+                        local okE, e = pcall(function() return child[key] end)
+                        if okE and e ~= nil then
+                            local result = parseRGBA(e)
+                            if result ~= nil then
+                                themeColorCache[typeName] = result
+                                return result
+                            end
+                        end
+                    end
+                end
+            end
+
+            themeColorCache[typeName] = false  -- cache miss
+            return nil
         end
 
         local function extractAppearance(target)
@@ -127,13 +267,18 @@ function main(...)
             return nil
         end
 
-        local function getName(obj)
-            if obj == nil then return "nil" end
-            local ok, res = pcall(function() return obj:Name() end)
-            if ok and res ~= nil then return res end
-            local ok2, res2 = pcall(function() return obj.Name end)
-            if ok2 and res2 ~= nil then return res2 end
-            return "?"
+        local function extractCueAppearance(seqObj)
+            if seqObj == nil then return nil end
+            if not seqObj.preferCueAppearance then return nil end  -- handles integer 1 from MA3
+            local ok, child = pcall(function() return seqObj:CurrentChild() end)
+            if not ok or child == nil then return nil end
+            -- CurrentChild() returns a container (e.g. "Sequence 126.3"), child[1] is the actual cue
+            local ok2, ap = pcall(function() return child[1] and child[1]["APPEARANCE"] end)
+            if ok2 and ap ~= nil then return ap end
+            -- Fallback: try direct appearance on child itself
+            local ok3, ap3 = pcall(function() return child["APPEARANCE"] end)
+            if ok3 and ap3 ~= nil then return ap3 end
+            return nil
         end
 
         local function getType(obj)
@@ -150,12 +295,35 @@ function main(...)
             return string.lower(tostring(t))
         end
 
+        -- Navigates to the DataPool entry for any object whose tostring() is "TypeName Index"
+        -- (e.g. "Group 18", "Sequence 5", "Macro 3") and returns its APPEARANCE, or nil.
+        local function extractPoolAppearance(obj)
+            if obj == nil then return nil end
+            local okStr, str = pcall(function() return tostring(obj) end)
+            if not okStr or type(str) ~= "string" then return nil end
+            local typeName, idx = string.match(str, "^(%a+)%s+(%d+)$")
+            if typeName == nil or idx == nil then return nil end
+            idx = tonumber(idx)
+            local poolKey = typeName .. "s"  -- "Group" -> "Groups", "Sequence" -> "Sequences"
+            local okPool, pool = pcall(function() return DataPool() end)
+            if not okPool or pool == nil then return nil end
+            local ok2, poolColl = pcall(function() return pool[poolKey] end)
+            if not ok2 or poolColl == nil then return nil end
+            local ok3, entry = pcall(function() return poolColl[idx] end)
+            if not ok3 or entry == nil then return nil end
+            local ok4, ap = pcall(function() return entry["APPEARANCE"] end)
+            if ok4 and ap ~= nil then return ap end
+            return nil
+        end
+
+
         local function isSequence(obj)
             if obj == nil then return false end
             local t = lowerType(obj)
             if t == "sequence" then return true end
-            local n = getName(obj)
-            if n and string.find(string.lower(tostring(n)), "sequence", 1, true) then
+            -- Fallback: tostring(obj) returns "Sequence N" even when :Type() fails
+            local okStr, str = pcall(function() return tostring(obj) end)
+            if okStr and type(str) == "string" and string.match(str, "^Sequence%s+%d+") then
                 return true
             end
             return false
@@ -298,7 +466,7 @@ function main(...)
         local function readExecutorState(execNo, wantsValue, wantsColor)
             local meta = execMetaCache[execNo]
             if meta == nil or meta.handle == nil then
-                return 0, "0,0,0,0", 0, nil, false
+                return 0, "0,0,0,0", 0
             end
 
             local faderValue = 0
@@ -311,14 +479,19 @@ function main(...)
 
             local colorValue = "0,0,0,0"
             if wantsColor then
-                local ap = extractAppearance(meta.sequenceObject)
+                local ap = extractCueAppearance(meta.sequenceObject)
+                    or extractAppearance(meta.sequenceObject)
                     or extractAppearance(meta.sequenceHostObject)
                     or extractAppearance(meta.primaryObject)
                     or extractAppearance(meta.handle)
+                    or extractPoolAppearance(meta.handleObject)
+                    or extractPoolAppearance(meta.primaryObject)
                 if ap ~= nil then
                     colorValue = ap["BACKR"] .. "," .. ap["BACKG"] .. "," .. ap["BACKB"] .. "," .. ap["BACKALPHA"]
                 else
-                    colorValue = getAppearanceColor(meta.primaryObject or meta.handle)
+                    colorValue = extractThemeColorString(meta.handleObject)
+                        or extractThemeColorString(meta.primaryObject)
+                        or "255,255,255,255"
                 end
             end
 
@@ -346,9 +519,8 @@ function main(...)
 
             for _, execNo in ipairs(executorsToWatch) do
                 local wantsValue = (execNo >= 201 and execNo <= 210)
-                local wantsColor = true
                 local refreshThis = refreshDetails or (execDirtyFlags and execDirtyFlags[execNo] == true)
-                local wantsColorThis = wantsColor and refreshThis
+                local wantsColorThis = refreshThis
 
                 local faderValue, colorValue, statusCode = readExecutorState(execNo, wantsValue, wantsColorThis)
                 if refreshThis and execDirtyFlags then
@@ -362,8 +534,7 @@ function main(...)
                     end
                 end
 
-                if wantsColor then
-                    if wantsColorThis then
+                if wantsColorThis then
                         currentColorValues[execNo] = colorValue
                         if oldColorValues[execNo] ~= colorValue then
                             colorChanged = true
@@ -376,7 +547,6 @@ function main(...)
                     else
                         currentColorValues[execNo] = oldColorValues[execNo] or colorValue
                     end
-                end
 
                 currentExecStatus[execNo] = statusCode
                 if oldExecStatus[execNo] ~= statusCode then
@@ -393,6 +563,57 @@ function main(...)
                 currentColorValues = currentColorValues,
                 currentExecStatus = currentExecStatus
             }
+        end
+
+        -- Reads LED brightness settings from MA3's DeskLightsCollect.
+        -- Returns a table with masterXxx, bgXxx, fbXxx fields (each 0-100),
+        -- or nil if the node is unavailable (e.g. no active session).
+        local function readDeskLights()
+            local okRoot, root = pcall(function() return Root() end)
+            if not okRoot or root == nil then return nil end
+            local okDlc, dlc = pcall(function() return root["StationSettings"]["DeskLightsCollect"] end)
+            if not okDlc or dlc == nil then return nil end
+
+            local function readNode(name)
+                local okN, node = pcall(function() return dlc[name] end)
+                if not okN or node == nil then return nil end
+                local okMa, ma = pcall(function() return node["MASTER"] end)
+                local okFa, fa = pcall(function() return node["LEDFADER"] end)
+                local okEx, ex = pcall(function() return node["LEDEXEC"] end)
+                local okKb, kb = pcall(function() return node["LEDKEYBOARD"] end)
+                return {
+                    master   = (okMa and type(ma) == "number") and ma or 0,
+                    fader    = (okFa and type(fa) == "number") and fa or 0,
+                    exec     = (okEx and type(ex) == "number") and ex or 0,
+                    keyboard = (okKb and type(kb) == "number") and kb or 0,
+                }
+            end
+
+            local masterNode = readNode("LEDMaster")
+            local bgNode     = readNode("LEDBackground")
+            local fbNode     = readNode("LEDFeedback")
+            if masterNode == nil or bgNode == nil or fbNode == nil then return nil end
+
+            return {
+                masterMaster   = masterNode.master,
+                masterFader    = masterNode.fader,
+                masterExec     = masterNode.exec,
+                masterKeyboard = masterNode.keyboard,
+                bgMaster       = bgNode.master,
+                bgFader        = bgNode.fader,
+                bgExec         = bgNode.exec,
+                bgKeyboard     = bgNode.keyboard,
+                fbMaster       = fbNode.master,
+                fbFader        = fbNode.fader,
+                fbExec         = fbNode.exec,
+                fbKeyboard     = fbNode.keyboard,
+            }
+        end
+
+        -- Calculates effective LED brightness (0-255) from four MA3 0-100 factor values.
+        -- Formula: floor(m1/100 * m2/100 * m3/100 * m4/100 * 255 + 0.5), clamped 0-255.
+        local function calcBrightness(m1, m2, m3, m4)
+            return math.min(255, math.max(0, math.floor(m1 / 100 * m2 / 100 * m3 / 100 * m4 / 100 * 255 + 0.5)))
         end
 
         Printf("start EvoFaderWing0.4 OSC - fader values/colors + executor status (101-410)")
@@ -421,6 +642,15 @@ function main(...)
         local lastSentPageUpdate = nil
         local PAGE_SETTLE_GUARD_TICKS = 3
         local pageSettleGuardTicks = 0
+        local lastDeskLockState = isDeskLocked()
+        local deskLockChanged = false
+        local lastCmdFlags = 0
+        local cmdFlagsChanged = false
+
+        -- LED brightness state (from DeskLightsCollect; sent via /ledBrightness)
+        local oldLedBrightnessKey = nil
+        local ledBrightnessDirty = false
+        local lastLedBrightnessMsg = nil
 
         local HOOK_DEBUG = false
         local hasHookObjectChange = type(HookObjectChange) == "function"
@@ -555,6 +785,32 @@ function main(...)
             return registered
         end
 
+        -- Reads DeskLightsCollect, computes 0-255 brightness values and caches the result.
+        -- Sets ledBrightnessDirty when values change.
+        -- OSC /ledBrightness,iiii: faderBg, faderFb, execBg, execFb
+        --   faderBg = LEDBackground LEDFADER → Fconfig.baseBrightness     (fader idle/not-touched)
+        --   faderFb = LEDFeedback   LEDFADER → Fconfig.touchedBrightness   (fader touched)
+        --   execBg  = LEDBackground LEDEXEC  → execMaBrightness            (exec occupied/off when toggle on)
+        --   execFb  = LEDFeedback   LEDEXEC  → execConfig.activeBrightness  (exec status=2 active)
+        -- Keyboard values are calculated for future use, not sent to wing yet.
+        local function computeLedBrightness()
+            local dl = readDeskLights()
+            if dl == nil then return end
+            local faderBg = calcBrightness(dl.masterMaster, dl.masterFader,    dl.bgMaster, dl.bgFader)
+            local faderFb = calcBrightness(dl.masterMaster, dl.masterFader,    dl.fbMaster, dl.fbFader)
+            local execBg  = calcBrightness(dl.masterMaster, dl.masterExec,     dl.bgMaster, dl.bgExec)
+            local execFb  = calcBrightness(dl.masterMaster, dl.masterExec,     dl.fbMaster, dl.fbExec)
+            -- keyboard: calculated for future use, not sent to wing yet
+            -- local kbBg = calcBrightness(dl.masterMaster, dl.masterKeyboard, dl.bgMaster, dl.bgKeyboard)
+            -- local kbFb = calcBrightness(dl.masterMaster, dl.masterKeyboard, dl.fbMaster, dl.fbKeyboard)
+            local key = faderBg .. "," .. faderFb .. "," .. execBg .. "," .. execFb
+            if key ~= oldLedBrightnessKey then
+                oldLedBrightnessKey = key
+                ledBrightnessDirty = true
+                lastLedBrightnessMsg = "/ledBrightness,iiii," .. faderBg .. "," .. faderFb .. "," .. execBg .. "," .. execFb
+            end
+        end
+
         if hooksEnabled then
             local registered = hookCurrentPage(destPage)
             pageDirty = false
@@ -590,6 +846,8 @@ function main(...)
             )
         end
 
+        computeLedBrightness() -- initial read before the loop
+
         while (GetVar(GlobalVars(), "EvoFaderWingRunning")) do
             if pageSettleGuardTicks > 0 then
                 pageSettleGuardTicks = pageSettleGuardTicks - 1
@@ -618,8 +876,30 @@ function main(...)
                 if refreshTick >= autoRefreshInterval then
                     markStateDirty()
                     markAllExecsDirty()
+                    computeLedBrightness()
                     refreshTick = 0
                 end
+            end
+
+            local currentDeskLock = isDeskLocked()
+            if currentDeskLock ~= lastDeskLockState then
+                lastDeskLockState = currentDeskLock
+                deskLockChanged = true
+                markStateDirty()
+                Printf("Desk lock state changed: " .. (currentDeskLock and "LOCKED" or "UNLOCKED"))
+                if not currentDeskLock then
+                    forceReload = true
+                    markAllExecsDirty()
+                    Printf("Desk unlocked - forcing full data resend")
+                end
+            end
+
+            -- CMD mode: poll MA3 command line state and push changes via wingStatus flags
+            local currentCmdFlags = getCmdFlags()
+            if currentCmdFlags ~= lastCmdFlags then
+                lastCmdFlags = currentCmdFlags
+                cmdFlagsChanged = true
+                Printf("CMD mode changed: flags=" .. currentCmdFlags)
             end
 
             local myPage = CurrentExecPage()
@@ -645,7 +925,7 @@ function main(...)
                 markAllExecsDirty()
             end
 
-            if stateDirty or forceReload then
+            if stateDirty or forceReload or deskLockChanged or cmdFlagsChanged or ledBrightnessDirty then
                 local refreshDetails = forceReload or pageDirty or not hooksEnabled
                 if not refreshDetails then
                     for _, execNo in ipairs(executorsToWatch) do
@@ -673,6 +953,24 @@ function main(...)
                 end
 
                 local allowDeltaSend = pageSettleGuardTicks <= 0
+
+                -- Send wingStatus FIRST when desk lock changes so the wing can reset
+                -- fader ownership before the execUpdate setpoints arrive.
+                -- Format: /wingStatus,ii,<deskLock 0|1>,<cmdFlags>
+                if forceReload or deskLockChanged or cmdFlagsChanged then
+                    local deskLockInt = lastDeskLockState and 1 or 0
+                    sendOsc("/wingStatus,ii," .. deskLockInt .. "," .. lastCmdFlags)
+                    Printf("Sent wing status: deskLock=" .. deskLockInt .. " cmdFlags=" .. lastCmdFlags)
+                    deskLockChanged = false
+                    cmdFlagsChanged = false
+                end
+
+                -- /ledBrightness: send fader/exec/keyboard brightness from MA3 DeskLightsCollect
+                if (forceReload or ledBrightnessDirty) and lastLedBrightnessMsg ~= nil then
+                    sendOsc(lastLedBrightnessMsg)
+                    Printf("Sent LED brightness: " .. lastLedBrightnessMsg)
+                    ledBrightnessDirty = false
+                end
 
                 if forceReload or (allowDeltaSend and (state.faderDataChanged or state.statusChanged)) then
                     local execMessage = "/execUpdate" .. execUpdateTypeTag .. "," .. destPage

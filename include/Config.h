@@ -173,11 +173,12 @@ struct FaderConfig {
 struct ExecConfig {
   uint8_t baseBrightness;     // Brightness when executor is populated but off
   uint8_t activeBrightness;   // Brightness when executor is on/active
-  bool useStaticColor;        // When true, use static RGB color instead of white
-  uint8_t staticRed;          // Static color components (0-255)
+  bool useStaticColor;          // When true, use static RGB color instead of white
+  uint8_t staticRed;            // Static color components (0-255)
   uint8_t staticGreen;
   uint8_t staticBlue;
-  uint8_t reserved[2];        // Space for future options
+  bool useMA3OccupiedBrightness; // When true, use MA3 LEDBackground for occupied/off (status=1)
+  uint8_t reserved[1];           // Reserved
 };
 
 // Touch sensor configuration
@@ -252,6 +253,19 @@ extern ExecConfig execConfig;
 
 // Page tracking
 extern int currentOSCPage;
+
+// Wing status flags — sent via /wingStatus OSC message with two int args:
+//   arg 0: deskLock (0 = unlocked, 1 = locked)
+//   arg 1: CMD flags bitmask (WING_STATUS_CMD_* values below)
+#define WING_STATUS_CMD_MODE      2  // Bit 1: MA3 cmd line active — add executor to cmdline
+#define WING_STATUS_CMD_EXEC_MODE 4  // Bit 2: MA3 cmd line active — add executor + auto-execute
+#define WING_STATUS_CMD_COPY_SRC  8  // Bit 3: copy/move with source already selected — target determines + prefix
+#define WING_STATUS_CMD_THRU     16  // Bit 4: thru active, send only exec number (no Page X.Y)
+extern bool deskLocked;
+
+// MA3 LEDBackground brightness for executors, received via /ledBrightness OSC.
+// Used for status=1 (occupied/off) when execConfig.useMA3OccupiedBrightness is true.
+extern uint8_t execMaBrightness;
 
 // Touch sensor globals
 extern int autoCalibrationMode;
