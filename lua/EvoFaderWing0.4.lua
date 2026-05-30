@@ -569,6 +569,57 @@ function main(...)
             }
         end
 
+        -- Reads LED brightness settings from MA3's DeskLightsCollect.
+        -- Returns a table with masterXxx, bgXxx, fbXxx fields (each 0-100),
+        -- or nil if the node is unavailable (e.g. no active session).
+        local function readDeskLights()
+            local okRoot, root = pcall(function() return Root() end)
+            if not okRoot or root == nil then return nil end
+            local okDlc, dlc = pcall(function() return root["StationSettings"]["DeskLightsCollect"] end)
+            if not okDlc or dlc == nil then return nil end
+
+            local function readNode(name)
+                local okN, node = pcall(function() return dlc[name] end)
+                if not okN or node == nil then return nil end
+                local okMa, ma = pcall(function() return node["MASTER"] end)
+                local okFa, fa = pcall(function() return node["LEDFADER"] end)
+                local okEx, ex = pcall(function() return node["LEDEXEC"] end)
+                local okKb, kb = pcall(function() return node["LEDKEYBOARD"] end)
+                return {
+                    master   = (okMa and type(ma) == "number") and ma or 0,
+                    fader    = (okFa and type(fa) == "number") and fa or 0,
+                    exec     = (okEx and type(ex) == "number") and ex or 0,
+                    keyboard = (okKb and type(kb) == "number") and kb or 0,
+                }
+            end
+
+            local masterNode = readNode("LEDMaster")
+            local bgNode     = readNode("LEDBackground")
+            local fbNode     = readNode("LEDFeedback")
+            if masterNode == nil or bgNode == nil or fbNode == nil then return nil end
+
+            return {
+                masterMaster   = masterNode.master,
+                masterFader    = masterNode.fader,
+                masterExec     = masterNode.exec,
+                masterKeyboard = masterNode.keyboard,
+                bgMaster       = bgNode.master,
+                bgFader        = bgNode.fader,
+                bgExec         = bgNode.exec,
+                bgKeyboard     = bgNode.keyboard,
+                fbMaster       = fbNode.master,
+                fbFader        = fbNode.fader,
+                fbExec         = fbNode.exec,
+                fbKeyboard     = fbNode.keyboard,
+            }
+        end
+
+        -- Calculates effective LED brightness (0-255) from four MA3 0-100 factor values.
+        -- Formula: floor(m1/100 * m2/100 * m3/100 * m4/100 * 255 + 0.5), clamped 0-255.
+        local function calcBrightness(m1, m2, m3, m4)
+            return math.min(255, math.max(0, math.floor(m1 / 100 * m2 / 100 * m3 / 100 * m4 / 100 * 255 + 0.5)))
+        end
+
         Printf("start EvoFaderWing0.4 OSC - fader values/colors + executor status (101-410)")
         if autoResendInterval > 0 then
             Printf(string.format("autoResendInterval: %d (every %.2f seconds)", autoResendInterval, ticksToSeconds(autoResendInterval)))
@@ -599,6 +650,11 @@ function main(...)
         local deskLockChanged = false
         local lastCmdFlags = 0
         local cmdFlagsChanged = false
+
+        -- LED brightness state (from DeskLightsCollect; sent via /ledBrightness)
+        local oldLedBrightnessKey = nil
+        local ledBrightnessDirty = false
+        local lastLedBrightnessMsg = nil
 
         local HOOK_DEBUG = false
         local hasHookObjectChange = type(HookObjectChange) == "function"
@@ -733,6 +789,32 @@ function main(...)
             return registered
         end
 
+        -- Reads DeskLightsCollect, computes 0-255 brightness values and caches the result.
+        -- Sets ledBrightnessDirty when values change.
+        -- OSC /ledBrightness,iiii: faderBg, faderFb, execBg, execFb
+        --   faderBg = LEDBackground LEDFADER → Fconfig.baseBrightness     (fader idle/not-touched)
+        --   faderFb = LEDFeedback   LEDFADER → Fconfig.touchedBrightness   (fader touched)
+        --   execBg  = LEDBackground LEDEXEC  → execMaBrightness            (exec occupied/off when toggle on)
+        --   execFb  = LEDFeedback   LEDEXEC  → execConfig.activeBrightness  (exec status=2 active)
+        -- Keyboard values are calculated for future use, not sent to wing yet.
+        local function computeLedBrightness()
+            local dl = readDeskLights()
+            if dl == nil then return end
+            local faderBg = calcBrightness(dl.masterMaster, dl.masterFader,    dl.bgMaster, dl.bgFader)
+            local faderFb = calcBrightness(dl.masterMaster, dl.masterFader,    dl.fbMaster, dl.fbFader)
+            local execBg  = calcBrightness(dl.masterMaster, dl.masterExec,     dl.bgMaster, dl.bgExec)
+            local execFb  = calcBrightness(dl.masterMaster, dl.masterExec,     dl.fbMaster, dl.fbExec)
+            -- keyboard: calculated for future use, not sent to wing yet
+            -- local kbBg = calcBrightness(dl.masterMaster, dl.masterKeyboard, dl.bgMaster, dl.bgKeyboard)
+            -- local kbFb = calcBrightness(dl.masterMaster, dl.masterKeyboard, dl.fbMaster, dl.fbKeyboard)
+            local key = faderBg .. "," .. faderFb .. "," .. execBg .. "," .. execFb
+            if key ~= oldLedBrightnessKey then
+                oldLedBrightnessKey = key
+                ledBrightnessDirty = true
+                lastLedBrightnessMsg = "/ledBrightness,iiii," .. faderBg .. "," .. faderFb .. "," .. execBg .. "," .. execFb
+            end
+        end
+
         if hooksEnabled then
             local registered = hookCurrentPage(destPage)
             pageDirty = false
@@ -768,6 +850,8 @@ function main(...)
             )
         end
 
+        computeLedBrightness() -- initial read before the loop
+
         while (GetVar(GlobalVars(), "EvoFaderWingRunning")) do
             if pageSettleGuardTicks > 0 then
                 pageSettleGuardTicks = pageSettleGuardTicks - 1
@@ -796,6 +880,7 @@ function main(...)
                 if refreshTick >= autoRefreshInterval then
                     markStateDirty()
                     markAllExecsDirty()
+                    computeLedBrightness()
                     refreshTick = 0
                 end
             end
@@ -844,7 +929,7 @@ function main(...)
                 markAllExecsDirty()
             end
 
-            if stateDirty or forceReload or deskLockChanged or cmdFlagsChanged then
+            if stateDirty or forceReload or deskLockChanged or cmdFlagsChanged or ledBrightnessDirty then
                 local refreshDetails = forceReload or pageDirty or not hooksEnabled
                 if not refreshDetails then
                     for _, execNo in ipairs(executorsToWatch) do
@@ -882,6 +967,13 @@ function main(...)
                     Printf("Sent wing status: deskLock=" .. deskLockInt .. " cmdFlags=" .. lastCmdFlags)
                     deskLockChanged = false
                     cmdFlagsChanged = false
+                end
+
+                -- /ledBrightness: send fader/exec/keyboard brightness from MA3 DeskLightsCollect
+                if (forceReload or ledBrightnessDirty) and lastLedBrightnessMsg ~= nil then
+                    sendOsc(lastLedBrightnessMsg)
+                    Printf("Sent LED brightness: " .. lastLedBrightnessMsg)
+                    ledBrightnessDirty = false
                 end
 
                 if forceReload or (allowDeltaSend and (state.faderDataChanged or state.statusChanged)) then

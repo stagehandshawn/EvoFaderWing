@@ -6,6 +6,7 @@
 #include "Config.h"
 #include "ExecutorStatus.h"
 #include "KeyLedControl.h"
+#include "NeoPixelControl.h"
 #include "OLED.h"
 #include "NetworkManager.h"
 #include <AsyncUDP_Teensy41.h>
@@ -50,6 +51,7 @@ static volatile uint32_t oscOversizeDrops = 0;
 void handleBundledExecutorUpdate(LiteOSCParser& parser);
 void handleColorUpdate(LiteOSCParser& parser);
 void handleWingStatus(LiteOSCParser& parser);
+void handleLedBrightness(LiteOSCParser& parser);
 static void handleOscPacket(const uint8_t* data, size_t len);
 static bool enqueueOscPacket(const uint8_t* data, size_t len);
 static bool dequeueOscPacket(OscQueueItem& out);
@@ -171,6 +173,8 @@ static void handleOscPacket(const uint8_t* data, size_t len) {
     handleColorUpdate(parser);
   } else if (strstr(addr, "/wingStatus") != NULL) {
     handleWingStatus(parser);
+  } else if (strstr(addr, "/ledBrightness") != NULL) {
+    handleLedBrightness(parser);
   } else if (strstr(addr, "/updatePage/current") != NULL) {
     if (parser.getTag(0) == 'i') {
       handlePageUpdate(addr, parser.getInt(0));
@@ -431,6 +435,43 @@ void handleColorUpdate(LiteOSCParser& parser) {
   // if (appliedColors > 0) {
   //   OSC_DEBUG_PRINTF("Color update received: page=%d colors=%d", pageNum, appliedColors);
   // }
+}
+
+// Handle LED brightness update from MA3 DeskLightsCollect.
+// Format: /ledBrightness,iiii,<faderBg>,<faderFb>,<execBg>,<execFb>
+// All values 0-255.
+//   faderBg/Fb  → FaderConfig (idle / touched)
+//   execBg      → execMaBrightness (used for status=1 when useMA3OccupiedBrightness is on)
+//   execFb      → ExecConfig.activeBrightness (status=2)
+void handleLedBrightness(LiteOSCParser& parser) {
+  if (parser.getArgCount() < 4) {
+    OSC_ERROR_PRINT("Invalid ledBrightness message (expected 4 int args)");
+    return;
+  }
+  for (int i = 0; i < 4; i++) {
+    if (parser.getTag(i) != 'i') {
+      OSC_ERROR_PRINTF("Invalid ledBrightness arg type at index %d", i);
+      return;
+    }
+  }
+
+  uint8_t faderBg = (uint8_t)constrain(parser.getInt(0), 0, 255);
+  uint8_t faderFb = (uint8_t)constrain(parser.getInt(1), 0, 255);
+  uint8_t execBg  = (uint8_t)constrain(parser.getInt(2), 0, 255);
+  uint8_t execFb  = (uint8_t)constrain(parser.getInt(3), 0, 255);
+
+  Fconfig.baseBrightness      = faderBg;
+  Fconfig.touchedBrightness   = faderFb;
+  execMaBrightness            = execBg;   // cached; used for status=1 when toggle is on
+  execConfig.activeBrightness = execFb;   // status=2 (active) from MA3 LEDFeedback
+  // execConfig.baseBrightness (status=1 fallback) stays at EEPROM/web-UI value
+
+  updateBaseBrightnessPixels();  // push new baseBrightness to all currently untouched faders
+  invalidateNeoPixelRenderCache();
+  markKeyLedsDirty();
+
+  OSC_DEBUG_PRINTF("LED brightness: faderBg=%d faderFb=%d execBg=%d execFb=%d",
+                   faderBg, faderFb, execBg, execFb);
 }
 
 

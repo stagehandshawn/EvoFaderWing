@@ -796,6 +796,7 @@ void handleLEDSettingsSave(String request) {
   String execBaseBrightnessStr = getParam(request, "eb");
   String execActiveBrightnessStr = getParam(request, "ea");
   bool newUseStaticColor = (request.indexOf("sc=on") >= 0 || request.indexOf("sc=1") >= 0);
+  bool newUseMA3OccupiedBrightness = (request.indexOf("ma3ob=on") >= 0 || request.indexOf("ma3ob=1") >= 0);
   String staticRedStr = getParam(request, "sr");
   String staticGreenStr = getParam(request, "sg");
   String staticBlueStr = getParam(request, "sb");
@@ -858,6 +859,7 @@ void handleLEDSettingsSave(String request) {
     parsedStaticB = constrainParam(staticBlueStr.toInt(), 0, 255, parsedStaticB);
   }
 
+  execConfig.useMA3OccupiedBrightness = newUseMA3OccupiedBrightness;
   execConfig.useStaticColor = newUseStaticColor;
   execConfig.staticRed = parsedStaticR;
   execConfig.staticGreen = parsedStaticG;
@@ -1481,10 +1483,13 @@ void handleLEDSettingsPage() {
               "<h3 style='margin: 6px 0;'>Exec LEDs</h3>"
               "<div class='form-group'><label>Off Level</label><input type='number' name='eb' value='"));
   safePrint((int)execConfig.baseBrightness);
-  safePrint(F("' min='0' max='255'><p class='help-text'>Level when populated/off.</p></div>"
-              "<div class='form-group'><label>On Level</label><input type='number' name='ea' value='"));
+  safePrint(F("' min='0' max='255'><p class='help-text'>Fallback level when populated/off (used when MA3 toggle is off).</p></div>"
+              "<div class='form-group'><label><input type='checkbox' name='ma3ob' value='on'"));
+  if (execConfig.useMA3OccupiedBrightness) safePrint(F(" checked"));
+  safePrint(F("> Use MA3 Brightness for Occupied/Off</label><p class='help-text'>When enabled, the Off Level is driven by GrandMA3 LEDBackground instead of the value above.</p></div>"));
+  safePrint(F("<div class='form-group'><label>On Level</label><input type='number' name='ea' value='"));
   safePrint((int)execConfig.activeBrightness);
-  safePrint(F("' min='0' max='255'><p class='help-text'>Level when active/on.</p></div>"
+  safePrint(F("' min='0' max='255'><p class='help-text'>Level when active/on (driven by MA3 LEDFeedback).</p></div>"
               "<div class='form-group'><label><input type='checkbox' name='sc' value='on'"));
   if (execConfig.useStaticColor) safePrint(F(" checked"));
   safePrint(F("> Use Static Color</label><p class='help-text'>Static color overrides appearance.</p></div>"

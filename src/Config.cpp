@@ -89,7 +89,8 @@ ExecConfig execConfig = {
   .staticRed = 255,
   .staticGreen = 255,
   .staticBlue = 255,
-  .reserved = {0, 0}
+  .useMA3OccupiedBrightness = false,
+  .reserved = {0}
 };
 
 //================================
@@ -112,6 +113,9 @@ unsigned long resetCheckStartTime = 0;
 
 // Calibration state flag
 bool calibrationInProgress = false;
+
+// MA3 LEDBackground brightness for executors (updated via /ledBrightness OSC; not persisted)
+uint8_t execMaBrightness = 0;
 
 
 //================================

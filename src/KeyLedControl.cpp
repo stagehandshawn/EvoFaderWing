@@ -97,7 +97,7 @@ void updateKeyLeds() {
     if (status == 2) {
       brightness = execConfig.activeBrightness;
     } else if (status == 1) {
-      brightness = execConfig.baseBrightness;
+      brightness = execConfig.useMA3OccupiedBrightness ? execMaBrightness : execConfig.baseBrightness;
     } else {
       brightness = 0;
     }
