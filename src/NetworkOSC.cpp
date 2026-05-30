@@ -265,21 +265,22 @@ static void applyColorToExecutor(int oscId, const char* colorString) {
 }
 
 
-// Handle wing status updates: desk lock flag and CMD mode bits
+// Handle wing status update: two separate int args — arg0=deskLock (0|1), arg1=cmdFlags bitmask
 void handleWingStatus(LiteOSCParser& parser) {
-  if (parser.getArgCount() < 1 || parser.getTag(0) != 'i') {
-    OSC_ERROR_PRINT("Invalid wingStatus message");
+  if (parser.getArgCount() < 2 || parser.getTag(0) != 'i' || parser.getTag(1) != 'i') {
+    OSC_ERROR_PRINT("Invalid wingStatus message (expected 2 int args: deskLock, cmdFlags)");
     return;
   }
 
-  int flags = parser.getInt(0);
-  bool newDeskLocked  = (flags & WING_STATUS_DESK_LOCK) != 0;
+  bool newDeskLocked = parser.getInt(0) != 0;
+  int  flags         = parser.getInt(1);
+
   bool newCmdMode     = (flags & WING_STATUS_CMD_MODE) != 0;
   bool newCmdExecMode = (flags & WING_STATUS_CMD_EXEC_MODE) != 0;
   bool newCmdCopySrc  = (flags & WING_STATUS_CMD_COPY_SRC) != 0;
   bool newCmdThru     = (flags & WING_STATUS_CMD_THRU) != 0;
-  OSC_DEBUG_PRINTF("Wing status: flags=%d deskLock=%d cmd=%d cmdExec=%d copySrc=%d thru=%d",
-                   flags, newDeskLocked ? 1 : 0, newCmdMode ? 1 : 0, newCmdExecMode ? 1 : 0, newCmdCopySrc ? 1 : 0, newCmdThru ? 1 : 0);
+  OSC_DEBUG_PRINTF("Wing status: deskLock=%d cmdFlags=%d cmd=%d cmdExec=%d copySrc=%d thru=%d",
+                   newDeskLocked ? 1 : 0, flags, newCmdMode ? 1 : 0, newCmdExecMode ? 1 : 0, newCmdCopySrc ? 1 : 0, newCmdThru ? 1 : 0);
 
   // Always update CMD mode flags — they change independently of deskLocked
   wingCmdMode     = newCmdMode;

@@ -79,18 +79,12 @@ function main(...)
             return false
         end
 
-        -- Wing status bitmask flags (must match WING_STATUS_* defines in Config.h)
-        local WING_STATUS_DESK_LOCK     = 1   -- bit 0: desk is locked
+        -- CMD status bitmask flags (must match WING_STATUS_* defines in Config.h)
+        -- Sent via /wingStatus as second argument. Desk lock is the first argument (0 or 1).
         local WING_STATUS_CMD_MODE      = 2   -- bit 1: MA3 cmd line active, add executor to cmdline
         local WING_STATUS_CMD_EXEC_MODE = 4   -- bit 2: MA3 cmd line active, add + auto-execute
         local WING_STATUS_CMD_COPY_SRC  = 8   -- bit 3: copy/move with source already selected
         local WING_STATUS_CMD_THRU      = 16  -- bit 4: thru active, send only exec number (no Page X.Y)
-
-        local function buildWingStatusFlags(deskLocked, cmdFlags)
-            local flags = cmdFlags or 0
-            if deskLocked then flags = flags + WING_STATUS_DESK_LOCK end
-            return flags
-        end
 
         -- CMD keyword table: true = intercept + Execute Yes, false = intercept + Execute No.
         -- Keywords not listed here = no interception, button behaves normally.
@@ -880,11 +874,12 @@ function main(...)
                 local allowDeltaSend = pageSettleGuardTicks <= 0
 
                 -- Send wingStatus FIRST when desk lock changes so the wing can reset
-                -- fader ownership before the execUpdate setpoints arrive
+                -- fader ownership before the execUpdate setpoints arrive.
+                -- Format: /wingStatus,ii,<deskLock 0|1>,<cmdFlags>
                 if forceReload or deskLockChanged or cmdFlagsChanged then
-                    local flags = buildWingStatusFlags(lastDeskLockState, lastCmdFlags)
-                    sendOsc("/wingStatus,i," .. flags)
-                    Printf("Sent wing status: deskLock=" .. (lastDeskLockState and "1" or "0") .. " cmdFlags=" .. lastCmdFlags .. " flags=" .. flags)
+                    local deskLockInt = lastDeskLockState and 1 or 0
+                    sendOsc("/wingStatus,ii," .. deskLockInt .. "," .. lastCmdFlags)
+                    Printf("Sent wing status: deskLock=" .. deskLockInt .. " cmdFlags=" .. lastCmdFlags)
                     deskLockChanged = false
                     cmdFlagsChanged = false
                 end
