@@ -269,21 +269,16 @@ function main(...)
 
         local function extractCueAppearance(seqObj)
             if seqObj == nil then return nil end
-            if seqObj.preferCueAppearance ~= true then return nil end
+            if not seqObj.preferCueAppearance then return nil end  -- handles integer 1 from MA3
             local ok, child = pcall(function() return seqObj:CurrentChild() end)
             if not ok or child == nil then return nil end
-            local ok2, ap = pcall(function() return child[1] and child[1].Appearance end)
+            -- CurrentChild() returns a container (e.g. "Sequence 126.3"), child[1] is the actual cue
+            local ok2, ap = pcall(function() return child[1] and child[1]["APPEARANCE"] end)
             if ok2 and ap ~= nil then return ap end
+            -- Fallback: try direct appearance on child itself
+            local ok3, ap3 = pcall(function() return child["APPEARANCE"] end)
+            if ok3 and ap3 ~= nil then return ap3 end
             return nil
-        end
-
-        local function getName(obj)
-            if obj == nil then return "nil" end
-            local ok, res = pcall(function() return obj:Name() end)
-            if ok and res ~= nil then return res end
-            local ok2, res2 = pcall(function() return obj.Name end)
-            if ok2 and res2 ~= nil then return res2 end
-            return "?"
         end
 
         local function getType(obj)
@@ -326,8 +321,9 @@ function main(...)
             if obj == nil then return false end
             local t = lowerType(obj)
             if t == "sequence" then return true end
-            local n = getName(obj)
-            if n and string.find(string.lower(tostring(n)), "sequence", 1, true) then
+            -- Fallback: tostring(obj) returns "Sequence N" even when :Type() fails
+            local okStr, str = pcall(function() return tostring(obj) end)
+            if okStr and type(str) == "string" and string.match(str, "^Sequence%s+%d+") then
                 return true
             end
             return false

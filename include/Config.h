@@ -263,6 +263,10 @@ extern int currentOSCPage;
 #define WING_STATUS_CMD_THRU     16  // Bit 4: thru active, send only exec number (no Page X.Y)
 extern bool deskLocked;
 
+// MA3 LEDBackground brightness for executors, received via /ledBrightness OSC.
+// Used for status=1 (occupied/off) when execConfig.useMA3OccupiedBrightness is true.
+extern uint8_t execMaBrightness;
+
 // Touch sensor globals
 extern int autoCalibrationMode;
 extern uint8_t touchThreshold;
