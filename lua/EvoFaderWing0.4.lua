@@ -96,14 +96,14 @@ function main(...)
         -- Keywords not listed here = no interception, button behaves normally.
         -- copy and move are handled separately below (context-aware behaviour).
         local CMD_KEYWORDS = {
-            store=true,  delete=true,  merge=true,
-            update=true, include=true, on=true,      off=true,
-            toggle=true, release=true, rel=true,     kill=true,
-            load=true,   select=true,  go=true,      goback=true,
-            top=true,    temp=true,    flash=true,   activate=true,
-            deactivate=true, unassign=true,
-            lock=true,   unlock=true,  label=true,
-            edit=true, assign=true
+            store=true, delete=true, fix=true,
+            update=true, on=true, off=true,
+            toggle=true, release=true, rel=true,
+            load=true, select=true, go=true,
+            top=true, temp=true, flash=true,   
+            deactivate=true, kill=true, activate=true,
+            lock=true, label=true, edit=true, 
+            assign=true
         }
 
         -- Returns the wingStatus CMD flags for the current MA3 command line.

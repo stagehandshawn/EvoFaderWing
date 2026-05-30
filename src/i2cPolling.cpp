@@ -13,6 +13,7 @@
 #include "NetworkOSC.h"
 #include "ExecutorStatus.h"
 #include "Keysend.h"
+#include "KeyCmdHandler.h"
 
 // There are a lot of safeguards here to handle noisy i2c lines so even the most EMI unfriendly build should behave well
 
@@ -24,22 +25,6 @@
 
 // Track last known pressed keys so the watchdog can force releases
 static bool trackedKeyStates[NUM_EXECUTORS_TRACKED] = {false};
-
-static int keyIndexFromNumber(uint16_t keyNumber) {
-  if (keyNumber >= 101 && keyNumber <= 110) return keyNumber - 101;
-  if (keyNumber >= 201 && keyNumber <= 210) return 10 + (keyNumber - 201);
-  if (keyNumber >= 301 && keyNumber <= 310) return 20 + (keyNumber - 301);
-  if (keyNumber >= 401 && keyNumber <= 410) return 30 + (keyNumber - 401);
-  return -1;
-}
-
-static uint16_t keyNumberFromIndex(int index) {
-  if (index >= 0 && index < 10) return 101 + index;
-  if (index >= 10 && index < 20) return 201 + (index - 10);
-  if (index >= 20 && index < 30) return 301 + (index - 20);
-  if (index >= 30 && index < 40) return 401 + (index - 30);
-  return 0;
-}
 
 // === I2C Slave Addresses ===
 #define I2C_ADDR_KEYBOARD  0x10  // Keyboard matrix ATmega - sends keypress data
@@ -447,114 +432,3 @@ void sendEncoderOSC(int encoderNumber, bool isPositive, int velocity) {
 
 
 
-// Updated this function to send OSC or Keypress data over USB if that setting is checked
-// May update this function name or add a seperate function later to keep things cleaner
-
-void sendKeyOSC(uint16_t keyNumber, uint8_t state) {
-  // Validate key number is in expected ranges
-  if (!((keyNumber >= 101 && keyNumber <= 110) ||
-        (keyNumber >= 201 && keyNumber <= 210) ||
-        (keyNumber >= 301 && keyNumber <= 310) ||
-        (keyNumber >= 401 && keyNumber <= 410))) {
-    I2C_ERROR_PRINTF("[OSC] Invalid key number for OSC: %d", keyNumber);
-    return;
-  }
-  
-  // Validate state
-  if (state > 1) {
-    I2C_ERROR_PRINTF("[OSC] Invalid key state: %d", state);
-    return;
-  }
-  
-  // Desk lock: block all key/OSC output silently
-  if (deskLocked) {
-    return;
-  }
-
-  // CMD mode: intercept button press and create/update EvoFaderWingCMD macro via /cmd OSC.
-  // Uses confirmed MA3 syntax: Set Macro "Name".1 property="value"
-  //
-  // Wing status → behaviour matrix:
-  // ┌──────────────────────────────────────┬──────────────────────┬─────────┐
-  // │ State                                │ Macro command        │ Execute │
-  // ├──────────────────────────────────────┼──────────────────────┼─────────┤
-  // │ CMD_MODE   (most keywords)           │ Page X.Y             │ No      │
-  // │ CMD_EXEC_MODE (store, del, ...)      │ Page X.Y             │ Yes     │
-  // │ CMD_COPY_SRC + empty target          │ At Page X.Y          │ Yes     │
-  // │ CMD_COPY_SRC + occupied target       │ + Page X.Y           │ No      │
-  // │ CMD_THRU (thru open, no end)         │ Y   (exec# only)     │ No      │
-  // │ CMD_THRU + CMD_EXEC_MODE (thru done) │ Y   (exec# only)     │ Yes     │
-  // └──────────────────────────────────────┴──────────────────────┴─────────┘
-  if (state == 1 && (wingCmdMode || wingCmdExecMode || wingCmdCopySrc || wingCmdThru)) {
-    bool targetOccupied = false;
-    if (wingCmdCopySrc) {
-      int targetIdx = keyIndexFromNumber(keyNumber);
-      targetOccupied = (targetIdx >= 0 && executorStatus[targetIdx] > 0);
-    }
-
-    const char* executeFlag = (wingCmdExecMode || (wingCmdCopySrc && !targetOccupied)) ? "Yes" : "No";
-    char deleteBuf[40];
-    char storeMacroBuf[40];
-    char storeLineBuf[40];
-    char setCmdBuf[80];
-    char setAddBuf[56];
-    char setExecBuf[56];
-    char goBuf[32];
-    snprintf(deleteBuf,     sizeof(deleteBuf),     "Delete Macro EvoFaderWingCMD /NoOops");
-    snprintf(storeMacroBuf, sizeof(storeMacroBuf), "Store Macro EvoFaderWingCMD /NoOops");
-    snprintf(storeLineBuf,  sizeof(storeLineBuf),  "Store Macro EvoFaderWingCMD.1 /NoOops");
-    if (wingCmdThru) {
-      // thru active: send only the executor number, no Page X.Y prefix
-      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"%d\" /NoOops", (int)keyNumber);
-    } else if (wingCmdCopySrc && targetOccupied) {
-      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"+ Page %d.%d\" /NoOops", currentOSCPage, (int)keyNumber);
-    } else if (wingCmdCopySrc) {
-      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"At Page %d.%d\" /NoOops", currentOSCPage, (int)keyNumber);
-    } else {
-      snprintf(setCmdBuf, sizeof(setCmdBuf), "Set Macro EvoFaderWingCMD.1 command=\"Page %d.%d\" /NoOops", currentOSCPage, (int)keyNumber);
-    }
-    snprintf(setAddBuf,     sizeof(setAddBuf),     "Set Macro EvoFaderWingCMD.1 AddToCmdLine=\"Yes\" /NoOops");
-    snprintf(setExecBuf,    sizeof(setExecBuf),    "Set Macro EvoFaderWingCMD.1 Execute=\"%s\" /NoOops", executeFlag);
-    snprintf(goBuf,         sizeof(goBuf),         "Go Macro EvoFaderWingCMD");
-    sendOscMessage("/cmd", ",s", deleteBuf);
-    delay(10);
-    sendOscMessage("/cmd", ",s", storeMacroBuf);
-    sendOscMessage("/cmd", ",s", storeLineBuf);
-    sendOscMessage("/cmd", ",s", setCmdBuf);
-    sendOscMessage("/cmd", ",s", setAddBuf);
-    sendOscMessage("/cmd", ",s", setExecBuf);
-    delay(50);
-    sendOscMessage("/cmd", ",s", goBuf);
-    I2C_DEBUG_PRINTF("[CMD] mode=%s key=%d occupied=%d macro fired",
-      wingCmdThru ? "thru" : (wingCmdCopySrc ? "copySrc" : (wingCmdExecMode ? "exec" : "cmd")),
-      (int)keyNumber, targetOccupied ? 1 : 0);
-    return;
-  }
-
-  // Send keypress if option is checked
-  if (Fconfig.sendKeystrokes){
-
-    // Send press if 1 and release if 0
-    state ? sendKeyPress(keyNumber) : sendKeyRelease(keyNumber);
-
-    I2C_DEBUG_PRINTF("[Key] Sent: %d %s", keyNumber, state ? "PRESSED" : "RELEASED");
-
-  } else {
-
-    // Create the OSC address
-    char oscAddress[32];
-    snprintf(oscAddress, sizeof(oscAddress), "/Key%d", keyNumber);
-    
-    // Convert state to int for OSC message
-    int keyState = (int)state;
-    
-    // Send the OSC message
-    sendOscMessage(oscAddress, ",i", &keyState);
-    
-    // Debug output
-    I2C_DEBUG_PRINTF("[OSC] Sent: %s %d (key %d %s)", 
-              oscAddress, keyState, keyNumber, state ? "PRESSED" : "RELEASED");
-
-  }
-
-}

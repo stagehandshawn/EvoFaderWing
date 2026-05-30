@@ -13,6 +13,5 @@ void processKeypressData(uint8_t count, uint8_t address);
 void processReleaseAll(uint8_t address);
 
 void sendEncoderOSC(int encoderNumber, bool isPositive, int velocity);
-void sendKeyOSC(uint16_t keyNumber, uint8_t state);
 
 #endif  // I2C_POLLING_H
